@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { SongEditor } from "@/components/song-editor";
-import { getSong } from "@/lib/songs";
+import { getSong, listChordShortcuts } from "@/lib/songs";
 
 export default function EditSongPage({ params }: PageProps<"/songs/[id]/edit">) {
   return (
-    <Suspense fallback={<p className="text-zinc-500">Loading…</p>}>
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
       <Editor params={params} />
     </Suspense>
   );
@@ -14,15 +13,7 @@ export default function EditSongPage({ params }: PageProps<"/songs/[id]/edit">) 
 
 async function Editor({ params }: { params: PageProps<"/songs/[id]/edit">["params"] }) {
   const { id } = await params;
-  const song = await getSong(id);
+  const [song, shortcuts] = await Promise.all([getSong(id), listChordShortcuts()]);
   if (!song) notFound();
-  return (
-    <>
-      <Link href={`/songs/${song.id}`} className="text-sm underline">
-        ← {song.title}
-      </Link>
-      <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">Edit song</h1>
-      <SongEditor song={song} />
-    </>
-  );
+  return <SongEditor song={song} shortcuts={shortcuts} />;
 }

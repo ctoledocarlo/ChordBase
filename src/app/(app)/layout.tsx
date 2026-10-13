@@ -1,30 +1,29 @@
 import { Suspense } from "react";
 import { signOut } from "./actions";
+import { AppShell } from "@/components/app-shell";
 import { getCurrentChurch } from "@/lib/church";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-        <span className="font-semibold tracking-tight">ChordBase</span>
+    <AppShell
+      account={
         <Suspense fallback={null}>
           <ChurchBar />
         </Suspense>
-      </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <Suspense fallback={<p className="text-zinc-500">Loading…</p>}>
-          <ChurchGate>{children}</ChurchGate>
-        </Suspense>
-      </main>
-    </div>
+      }
+    >
+      <Suspense fallback={<p className="text-muted">Loading…</p>}>
+        <ChurchGate>{children}</ChurchGate>
+      </Suspense>
+    </AppShell>
   );
 }
 
 async function ChurchBar() {
   const church = await getCurrentChurch();
   return (
-    <div className="flex items-center gap-4 text-sm">
-      {church && <span className="text-zinc-600 dark:text-zinc-400">{church.name}</span>}
+    <div className="flex items-center gap-3 text-sm">
+      {church && <span className="hidden font-medium text-muted sm:inline">{church.name}</span>}
       <form action={signOut}>
         <button type="submit" className="underline">
           Log out

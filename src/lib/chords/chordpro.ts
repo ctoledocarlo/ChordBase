@@ -10,6 +10,7 @@ export type SongLine =
   | { type: "lyrics"; segments: Segment[] }
   | { type: "comment"; text: string }
   | { type: "section"; label: string }
+  | { type: "column_break" }
   | { type: "blank" };
 
 export interface SongMeta {
@@ -86,6 +87,8 @@ export function parseChordPro(source: string): ParsedSong {
       const value = d[2] ?? "";
       if (name in SECTION_STARTS) {
         lines.push({ type: "section", label: value || SECTION_STARTS[name] });
+      } else if (name === "column_break" || name === "cb") {
+        lines.push({ type: "column_break" });
       } else if (SECTION_ENDS.has(name)) {
         // Sections are shown by their label only.
       } else if (COMMENTS.has(name)) {

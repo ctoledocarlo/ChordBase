@@ -1,9 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 import { supabaseEnv } from "./env";
 
 /** Supabase client for Server Components, Server Actions and Route Handlers. */
 export async function createClient() {
+  // Supabase reads the current time to check token expiry, which Next forbids
+  // during prerendering. Wait for a real request first.
+  await connection();
   const cookieStore = await cookies();
   const { url, key } = supabaseEnv();
 

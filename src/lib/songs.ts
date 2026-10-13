@@ -40,3 +40,36 @@ export async function getSong(id: string): Promise<Song | null> {
   const { data } = await supabase.from("songs").select("*").eq("id", id).maybeSingle<Song>();
   return data;
 }
+
+export type PresetSettings = {
+  /** Semitones above the original key. */
+  semitones: number;
+  capo: number;
+  spelling: "auto" | "sharp" | "flat";
+  showChords: boolean;
+  /** Text size in pixels; 0 means fit to screen. */
+  fontSize: number;
+};
+
+export type Preset = { id: string; name: string; settings: PresetSettings };
+
+export async function listPresets(songId: string): Promise<Preset[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("song_presets")
+    .select("id, name, settings")
+    .eq("song_id", songId)
+    .order("created_at", { ascending: true });
+  return (data as Preset[] | null) ?? [];
+}
+
+export type ChordShortcut = { id: string; chord: string };
+
+export async function listChordShortcuts(): Promise<ChordShortcut[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("chord_shortcuts")
+    .select("id, chord")
+    .order("created_at", { ascending: true });
+  return (data as ChordShortcut[] | null) ?? [];
+}

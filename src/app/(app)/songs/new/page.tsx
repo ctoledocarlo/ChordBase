@@ -1,14 +1,16 @@
-import Link from "next/link";
+import { Suspense } from "react";
 import { SongEditor } from "@/components/song-editor";
+import { listChordShortcuts } from "@/lib/songs";
 
 export default function NewSongPage() {
   return (
-    <>
-      <Link href="/" className="text-sm underline">
-        ← Songs
-      </Link>
-      <h1 className="mt-2 mb-6 text-2xl font-semibold tracking-tight">Add song</h1>
-      <SongEditor />
-    </>
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+      <Editor />
+    </Suspense>
   );
+}
+
+async function Editor() {
+  const shortcuts = await listChordShortcuts();
+  return <SongEditor shortcuts={shortcuts} />;
 }

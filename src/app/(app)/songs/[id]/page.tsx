@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { SongView } from "@/components/song-view";
-import { getSong } from "@/lib/songs";
+import { getSong, listPresets } from "@/lib/songs";
 import { deleteSong } from "../actions";
 
 export default function SongPage({ params }: PageProps<"/songs/[id]">) {
   return (
-    <Suspense fallback={<p className="text-zinc-500">Loading…</p>}>
+    <Suspense fallback={<p className="text-muted">Loading…</p>}>
       <Song params={params} />
     </Suspense>
   );
@@ -15,42 +15,32 @@ export default function SongPage({ params }: PageProps<"/songs/[id]">) {
 
 async function Song({ params }: { params: PageProps<"/songs/[id]">["params"] }) {
   const { id } = await params;
-  const song = await getSong(id);
+  const [song, presets] = await Promise.all([getSong(id), listPresets(id)]);
   if (!song) notFound();
 
-  const meta = [
-    song.artist,
-    song.original_key && `Key ${song.original_key}`,
-    song.default_capo > 0 && `Capo ${song.default_capo}`,
-    song.tempo && `${song.tempo} BPM`,
-    song.time_signature,
-  ].filter(Boolean);
-
+  // The song itself is shown by SongView, laid out the same as the editor's Preview tab.
   return (
-    <>
-      <Link href="/" className="text-sm underline">
-        ← Songs
-      </Link>
-      <div className="mt-2 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{song.title}</h1>
-          <p className="mt-1 text-sm text-zinc-500">{meta.join(" · ")}</p>
-        </div>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href={`/songs/${song.id}/edit`} className="underline">
-            Edit
+    <SongView
+      songId={song.id}
+      title={song.title}
+      tempo={song.tempo}
+      originalKey={song.original_key}
+      defaultCapo={song.default_capo}
+      body={song.body}
+      presets={presets}
+      actions={
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-5">
+          <Link href={`/songs/${song.id}/edit`} className="btn btn-primary">
+            Edit song
           </Link>
           <form action={deleteSong}>
             <input type="hidden" name="id" value={song.id} />
-            <button type="submit" className="text-red-600 underline dark:text-red-400">
+            <button type="submit" className="text-sm text-danger hover:underline">
               Delete
             </button>
           </form>
         </div>
-      </div>
-      <div className="mt-6">
-        <SongView originalKey={song.original_key} body={song.body} />
-      </div>
-    </>
+      }
+    />
   );
 }

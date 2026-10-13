@@ -59,6 +59,18 @@ export function parseChord(text: string): Chord | null {
   };
 }
 
+/** Quality part of a chord: optional m/maj/dim/aug, a number, then sus/add/alteration extras. */
+const QUALITY_RE = /^(?:maj|min|dim|aug|m|M|ø|°|\+|-)?\d{0,2}(?:sus[24]?|add\d{1,2}|no\d|[#b+-]\d{1,2}|\([^)]*\))*$/;
+
+/** True for chords the app can transpose, plus "N.C." (no chord). */
+export function isValidChord(text: string): boolean {
+  const t = text.trim();
+  if (/^N\.?C\.?$/i.test(t)) return true;
+  const chord = parseChord(t);
+  if (!chord) return false;
+  return chord.quality === "6/9" || QUALITY_RE.test(chord.quality);
+}
+
 export function formatChord(chord: Chord): string {
   const note = (n: Note) => n.letter + n.accidental;
   return note(chord.root) + chord.quality + (chord.bass ? "/" + note(chord.bass) : "");
@@ -77,6 +89,18 @@ export function spellingForKey(key: string): Spelling {
   // A minor key shares its signature with the major key 3 semitones up.
   const majorPc = isMinorQuality(chord.quality) ? (pc + 3) % 12 : pc;
   return FLAT_MAJOR_KEYS.has(majorPc) ? "flat" : "sharp";
+}
+
+/** The chords that naturally belong to a key (plus the dominant 7th / major V), for quick picking. */
+export function diatonicChords(key: string): string[] {
+  const chord = parseChord(key);
+  if (!chord) return [];
+  const pc = pitchClass(chord.root);
+  const spelling = spellingForKey(key);
+  const steps: [number, string][] = isMinorQuality(chord.quality)
+    ? [[0, "m"], [3, ""], [5, "m"], [7, "m"], [8, ""], [10, ""], [7, ""]]
+    : [[0, ""], [2, "m"], [4, "m"], [5, ""], [7, ""], [9, "m"], [7, "7"]];
+  return steps.map(([interval, quality]) => noteName(pc + interval, spelling) + quality);
 }
 
 /** Semitones to move a song from one key to another (0-11, always upward). */

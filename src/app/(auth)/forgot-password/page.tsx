@@ -10,7 +10,7 @@ export default function ForgotPasswordPage({
   return (
     <>
       <h1 className="mb-1 text-lg font-semibold">Reset your password</h1>
-      <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mb-4 text-sm text-muted">
         We&apos;ll email a link to choose a new password.
       </p>
       <Suspense>
@@ -29,7 +29,7 @@ async function ExpiredLinkNotice({
   const { error } = await searchParams;
   if (error !== "expired") return null;
   return (
-    <p role="alert" className="mb-4 text-sm text-red-600 dark:text-red-400">
+    <p role="alert" className="mb-4 text-sm text-danger">
       That reset link is invalid or has expired. Request a new one below.
     </p>
   );
