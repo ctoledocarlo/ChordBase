@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useRef, useState, useTransition, type FormEvent } from "react";
 import {
   addChordShortcut,
@@ -25,11 +26,13 @@ import {
   type DropTarget,
   type EditorSection,
 } from "@/lib/chords";
+import type { ImportedSong } from "@/lib/import/song";
 import type { ChordShortcut, Song } from "@/lib/songs";
 import { ChordsTab } from "./editor-chords";
 import { LyricsTab } from "./editor-lyrics";
 import { PreviewTab } from "./editor-preview";
 import { RedoIcon, UndoIcon } from "./icons";
+import { Modal } from "./modal";
 import { SidebarPortal } from "./sidebar-portal";
 import type { EditorTab, SongInfo, Target } from "./song-editor-shared";
 
@@ -88,6 +91,14 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const [working, startWorking] = useTransition();
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importState, setImportState] = useState<{
+    busy: boolean;
+    error?: string;
+    notes: string[];
+    /** Several songs or versions were found; the person picks one. */
+    choices?: ImportedSong[];
+  }>({ busy: false, notes: [] });
 
   const sections = history.present;
   const body = serializeSections(sections);
@@ -304,6 +315,56 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
     });
   }
 
+  // ---- importing a PowerPoint file ------------------------------------------
+
+  /** Reads one PowerPoint file and fills the whole editor from it. */
+  async function importFile(file: File) {
+    setImportState({ busy: true, notes: [] });
+    try {
+      // Loaded only now, so the page doesn't carry the file readers until they are needed.
+      const { importDeck } = await import("@/lib/import/song");
+      const songs = importDeck(file.name, new Uint8Array(await file.arrayBuffer()));
+      if (songs.length === 0) {
+        setImportState({ busy: false, notes: [], error: "No song text was found in that file." });
+      } else if (songs.length === 1 && songs[0].versions.length === 1) {
+        applyImport(songs[0], 0);
+      } else {
+        setImportState({ busy: false, notes: [], choices: songs });
+      }
+    } catch (error) {
+      setImportState({
+        busy: false,
+        notes: [],
+        error: error instanceof Error ? error.message : "That file couldn't be read.",
+      });
+    }
+  }
+
+  function applyImport(imported: ImportedSong, versionIndex: number) {
+    const version = imported.versions[versionIndex];
+    const hasWork = info.title.trim() !== "" || sections.some((s) => s.lines.some((l) => l.text.trim() !== ""));
+    if (hasWork && !window.confirm("Replace what you have so far with the imported song?")) {
+      setImportState({ busy: false, notes: [] });
+      return;
+    }
+    setInfo((i) => ({
+      ...i,
+      title: imported.title,
+      artist: imported.artist,
+      key: version.key,
+      tempo: version.tempo ? String(version.tempo) : "",
+      timeSignature: imported.timeSignature,
+      capo: String(version.capo),
+    }));
+    // Going through the history means Undo brings back what was there before.
+    commit(() => version.sections);
+    setSelectedId(version.sections[0]?.id ?? "");
+    setEditing(null);
+    setTried(false);
+    setTab("lyrics");
+    setImportState({ busy: false, notes: imported.warnings });
+  }
+
   // ---- saving --------------------------------------------------------------
 
   /** Everything the song needs before it can be saved and transposed later. */
@@ -367,7 +428,74 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
       )}
       {tab === "preview" && <PreviewTab info={info} sections={sections} size={textSize} onMove={moveSection} />}
 
+      <Modal
+        open={!!importState.choices}
+        title="Which one?"
+        onClose={() => setImportState({ busy: false, notes: [] })}
+      >
+        <p className="mb-3 text-sm text-muted">That file has more than one song or version. Pick the one to use.</p>
+        <ul className="divide-y divide-line border-y border-line">
+          {importState.choices?.flatMap((imported) =>
+            imported.versions.map((version, i) => (
+              <li key={`${imported.title}-${i}`}>
+                <button
+                  type="button"
+                  className="w-full px-1 py-3 text-left hover:bg-hover"
+                  onClick={() => applyImport(imported, i)}
+                >
+                  <span className="font-medium">{imported.title}</span>
+                  <span className="ml-2 text-sm text-muted">
+                    {version.label}
+                    {version.key ? `, key of ${version.key}` : ""}
+                  </span>
+                </button>
+              </li>
+            )),
+          )}
+        </ul>
+      </Modal>
+
       <SidebarPortal>
+        {!song && (
+          <section className="space-y-2">
+            <input
+              ref={importInput}
+              type="file"
+              accept=".ppt,.pptx"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void importFile(file);
+              }}
+            />
+            <button
+              type="button"
+              className="btn w-full"
+              disabled={importState.busy}
+              onClick={() => importInput.current?.click()}
+            >
+              {importState.busy ? "Reading…" : "Import"}
+            </button>
+            <p className="text-sm leading-snug text-muted">Fill in this song from a PowerPoint file.</p>
+            <Link href="/songs/import" className="block text-sm text-muted underline hover:text-foreground">
+              Import many songs
+            </Link>
+            {importState.error && (
+              <p role="alert" className="text-sm text-danger">
+                {importState.error}
+              </p>
+            )}
+            {importState.notes.length > 0 && (
+              <ul className="list-disc space-y-1 pl-4 text-sm leading-snug text-muted">
+                {importState.notes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
         <nav aria-label="Song editor" className="-mx-1">
           {TABS.map((t) => (
             <button

@@ -73,3 +73,12 @@ export async function listChordShortcuts(): Promise<ChordShortcut[]> {
     .order("created_at", { ascending: true });
   return (data as ChordShortcut[] | null) ?? [];
 }
+
+export type SongName = { title: string; artist: string };
+
+/** Titles already in the library, for spotting songs that would be imported twice. */
+export async function listSongNames(): Promise<SongName[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("songs").select("title, artist");
+  return (data as SongName[] | null) ?? [];
+}

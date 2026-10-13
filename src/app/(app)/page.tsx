@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { SidebarPortal } from "@/components/sidebar-portal";
+import { SearchForm } from "@/components/search-form";
 import { getCurrentChurch } from "@/lib/church";
 import { listSongs } from "@/lib/songs";
 
@@ -22,20 +22,24 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
 
   return (
     <div className="mx-auto w-full max-w-4xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Songs</h1>
-      <p className="mt-1 text-sm text-muted">
-        {q ? `${songs.length} matching “${q}”` : `${songs.length} ${songs.length === 1 ? "song" : "songs"}`}
-      </p>
-
-      <SidebarPortal>
-        <SearchForm q={q} />
-        <Link href="/songs/new" className="btn btn-primary w-full">
-          Add song
-        </Link>
-      </SidebarPortal>
-      <div className="mt-5 lg:hidden">
-        <SearchForm q={q} />
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Songs</h1>
+          <p className="mt-1 text-sm text-muted">
+            {q ? `${songs.length} matching “${q}”` : `${songs.length} ${songs.length === 1 ? "song" : "songs"}`}
+          </p>
+        </div>
+        <div className="flex flex-none gap-2">
+          <Link href="/songs/import" className="btn">
+            Import
+          </Link>
+          <Link href="/songs/new" className="btn btn-primary">
+            Add song
+          </Link>
+        </div>
       </div>
+
+      <SearchForm action="/" q={q} label="Search songs" placeholder="Search by title or artist" />
 
       {songs.length === 0 ? (
         <p className="mt-10 text-muted">{q ? "Nothing matches that search." : "No songs yet. Add your first one."}</p>
@@ -53,20 +57,5 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
         </ul>
       )}
     </div>
-  );
-}
-
-function SearchForm({ q }: { q: string }) {
-  return (
-    <form action="/">
-      <input
-        type="search"
-        name="q"
-        defaultValue={q}
-        placeholder="Search by title or artist"
-        aria-label="Search songs"
-        className="field"
-      />
-    </form>
   );
 }

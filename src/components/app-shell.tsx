@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { BackLink } from "./back-link";
 import { CloseIcon, MenuIcon } from "./icons";
 import { SIDEBAR_SLOT_ID } from "./sidebar-portal";
 import {
@@ -68,53 +69,60 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
       </header>
 
       <div className="flex flex-1 flex-col lg:flex-row">
-        <div className="border-b border-line px-4 py-2 lg:hidden">
-          <button type="button" onClick={() => setOpen(true)} className="btn">
-            <MenuIcon /> Page options
-          </button>
-        </div>
-
-        {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={close} aria-hidden />}
-
-        <aside
-          aria-label="Page options"
-          style={{ "--sidebar-w": `${width}px` } as CSSProperties}
-          className={`fixed inset-y-0 left-0 z-40 w-[var(--sidebar-w)] border-r border-line bg-background transition-transform lg:sticky lg:top-14 lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:shrink-0 lg:translate-x-0 lg:transition-none ${
-            open ? "translate-x-0" : "-translate-x-full"
-          }`}
-        >
-          <div className="h-full space-y-5 overflow-y-auto p-3">
-            <div className="flex items-center justify-between lg:hidden">
-              <span className="text-sm font-medium">Page options</span>
-              <button type="button" onClick={close} aria-label="Close" className="btn btn-quiet btn-icon">
-                <CloseIcon />
-              </button>
-            </div>
-            <div id={SIDEBAR_SLOT_ID} className="space-y-6" />
+        <Suspense fallback={null}>
+          <SidebarGate>
+          <div className="border-b border-line px-4 py-2 lg:hidden">
+            <button type="button" onClick={() => setOpen(true)} className="btn">
+              <MenuIcon /> Page options
+            </button>
           </div>
 
-          {/* Drag the edge to change the width; double-click to go back to the default. */}
-          <div
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize sidebar"
-            aria-valuemin={SIDEBAR_MIN}
-            aria-valuemax={SIDEBAR_MAX}
-            aria-valuenow={width}
-            tabIndex={0}
-            onPointerDown={onHandleDown}
-            onPointerMove={onHandleMove}
-            onPointerUp={onHandleUp}
-            onPointerCancel={onHandleUp}
-            onDoubleClick={() => saveSidebarWidth(SIDEBAR_DEFAULT)}
-            onKeyDown={onHandleKey}
-            className={`absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none select-none hover:bg-accent/30 lg:block ${
-              dragWidth !== null ? "bg-accent/40" : ""
+          {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={close} aria-hidden />}
+
+          <aside
+            aria-label="Page options"
+            style={{ "--sidebar-w": `${width}px` } as CSSProperties}
+            className={`fixed inset-y-0 left-0 z-40 w-[var(--sidebar-w)] border-r border-line bg-background transition-transform lg:sticky lg:top-14 lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:shrink-0 lg:translate-x-0 lg:transition-none ${
+              open ? "translate-x-0" : "-translate-x-full"
             }`}
-          />
-        </aside>
+          >
+            <div className="h-full space-y-5 overflow-y-auto p-3">
+              <div className="flex items-center justify-between lg:hidden">
+                <span className="text-sm font-medium">Page options</span>
+                <button type="button" onClick={close} aria-label="Close" className="btn btn-quiet btn-icon">
+                  <CloseIcon />
+                </button>
+              </div>
+              <div id={SIDEBAR_SLOT_ID} className="space-y-6" />
+            </div>
+
+            {/* Drag the edge to change the width; double-click to go back to the default. */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize sidebar"
+              aria-valuemin={SIDEBAR_MIN}
+              aria-valuemax={SIDEBAR_MAX}
+              aria-valuenow={width}
+              tabIndex={0}
+              onPointerDown={onHandleDown}
+              onPointerMove={onHandleMove}
+              onPointerUp={onHandleUp}
+              onPointerCancel={onHandleUp}
+              onDoubleClick={() => saveSidebarWidth(SIDEBAR_DEFAULT)}
+              onKeyDown={onHandleKey}
+              className={`absolute inset-y-0 -right-1 hidden w-2 cursor-col-resize touch-none select-none hover:bg-accent/30 lg:block ${
+                dragWidth !== null ? "bg-accent/40" : ""
+              }`}
+            />
+          </aside>
+          </SidebarGate>
+        </Suspense>
 
         <main className="min-w-0 flex-1 px-4 py-8 lg:px-10">
+          <Suspense fallback={null}>
+            <PageBack />
+          </Suspense>
           {children}
         </main>
       </div>
@@ -125,12 +133,8 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
 function MainNav() {
   const pathname = usePathname();
   const items = [
-    {
-      href: "/",
-      label: "Songs",
-      active: pathname === "/" || (pathname.startsWith("/songs/") && pathname !== "/songs/new"),
-    },
-    { href: "/songs/new", label: "Add song", active: pathname === "/songs/new" },
+    { href: "/setlists", label: "Setlists", soon: true, active: pathname.startsWith("/setlists") },
+    { href: "/", label: "Songs", soon: false, active: pathname === "/" || pathname.startsWith("/songs") },
   ];
   return (
     <nav aria-label="Main" className="flex items-stretch gap-5 text-sm">
@@ -146,8 +150,28 @@ function MainNav() {
           }`}
         >
           {it.label}
+          {it.soon && (
+            <span className="ml-1.5 hidden self-center rounded-full border border-line px-1.5 text-[0.6875rem] leading-4 text-muted md:inline">
+              Soon
+            </span>
+          )}
         </Link>
       ))}
     </nav>
   );
+}
+
+/** Every page except the two main ones gets a way back, to the page it came from. */
+function PageBack() {
+  const pathname = usePathname();
+  if (pathname === "/" || pathname === "/setlists") return null;
+  const edit = pathname.match(/^\/songs\/([^/]+)\/edit$/);
+  const fallback = edit ? `/songs/${edit[1]}` : pathname.startsWith("/setlists") ? "/setlists" : "/";
+  return <BackLink fallback={fallback} />;
+}
+
+/** Only pages that put something in the sidebar get one: the song pages and the editor. */
+function SidebarGate({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  return pathname.startsWith("/songs/") && pathname !== "/songs/import" ? <>{children}</> : null;
 }

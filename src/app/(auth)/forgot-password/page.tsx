@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { BackLink } from "@/components/back-link";
 import { ForgotPasswordForm } from "@/components/auth-forms";
 
 export const metadata: Metadata = { title: "Reset password · ChordBase" };
@@ -9,6 +10,7 @@ export default function ForgotPasswordPage({
 }: PageProps<"/forgot-password">) {
   return (
     <>
+      <BackLink fallback="/login" label="Back to sign in" />
       <h1 className="mb-1 text-lg font-semibold">Reset your password</h1>
       <p className="mb-4 text-sm text-muted">
         We&apos;ll email a link to choose a new password.

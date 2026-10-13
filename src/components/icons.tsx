@@ -82,6 +82,11 @@ export const MinusIcon = () => (
     <path d="M3 8h10" />
   </Icon>
 );
+export const BackIcon = () => (
+  <Icon>
+    <path d="M13 8H3M7 4 3 8l4 4" />
+  </Icon>
+);
 export const ChevronIcon = () => (
   <Icon>
     <path d="m4 6 4 4 4-4" />
