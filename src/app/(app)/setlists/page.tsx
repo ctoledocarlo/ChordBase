@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { DeleteButton } from "@/components/delete-button";
 import { NewSetlist } from "@/components/new-setlist";
 import { SearchForm } from "@/components/search-form";
 import { getCurrentChurch } from "@/lib/church";
+import { deleteSetlist } from "./actions";
+import { formatDay } from "@/lib/setlist-expiry";
 import { listSetlists, type SetlistSummary } from "@/lib/setlists";
 
 export default function SetlistsPage({ searchParams }: PageProps<"/setlists">) {
@@ -11,18 +14,6 @@ export default function SetlistsPage({ searchParams }: PageProps<"/setlists">) {
       <Setlists searchParams={searchParams} />
     </Suspense>
   );
-}
-
-/** "Sun, Oct 18" — read as a plain date so the time zone can't shift it a day. */
-function formatDate(value: string): string {
-  const [y, m, d] = value.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">["searchParams"] }) {
@@ -67,14 +58,22 @@ function Group({ title, rows }: { title: string; rows: SetlistSummary[] }) {
       <h2 className="mb-2 text-sm font-medium text-muted">{title}</h2>
       <ul className="divide-y divide-line border-y border-line">
         {rows.map((s) => (
-          <li key={s.id}>
-            <Link href={`/setlists/${s.id}`} className="flex items-baseline gap-4 px-1 py-3.5 hover:bg-hover">
+          <li key={s.id} className="flex items-center gap-1 hover:bg-hover">
+            <Link href={`/setlists/${s.id}`} className="flex min-w-0 flex-1 items-baseline gap-4 px-1 py-3.5">
               <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
-              <span className="hidden text-sm text-muted sm:inline">{s.service_date ? formatDate(s.service_date) : "No date"}</span>
+              <span className="hidden text-sm text-muted sm:inline">{s.service_date ? formatDay(s.service_date) : "No date"}</span>
+              <span className="hidden text-xs text-muted md:inline">Expires {formatDay(s.expires_at)}</span>
               <span className="w-20 text-right text-sm text-muted">
                 {s.songCount} {s.songCount === 1 ? "song" : "songs"}
               </span>
             </Link>
+            <DeleteButton
+              compact
+              action={deleteSetlist}
+              id={s.id}
+              title={`Delete “${s.name}”?`}
+              message="This setlist will be deleted. The songs in it stay in your library."
+            />
           </li>
         ))}
       </ul>

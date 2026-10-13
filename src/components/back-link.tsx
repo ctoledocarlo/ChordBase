@@ -13,6 +13,7 @@ export function BackLink({ fallback, label = "Back" }: { fallback: string; label
   return (
     <Link
       href={fallback}
+      data-back
       onClick={(e) => {
         if (window.history.length > 1) {
           e.preventDefault();

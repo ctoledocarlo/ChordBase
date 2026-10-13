@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createSetlist } from "@/app/(app)/setlists/actions";
+import { DEFAULT_KEEP_MONTHS, KEEP_OPTIONS } from "@/lib/setlist-expiry";
 import { Modal } from "./modal";
 
 /** The "New setlist" button and the little form it opens. */
@@ -16,11 +17,22 @@ export function NewSetlist() {
         <form action={createSetlist} className="space-y-5">
           <label className="block">
             <span className="label">Name</span>
-            <input name="name" required maxLength={80} autoFocus placeholder="Sunday service" className="field" />
+            <input name="name" required maxLength={80} autoFocus defaultValue="Sunday Service" className="field" />
           </label>
           <label className="block">
             <span className="label">Date (optional)</span>
             <input name="service_date" type="date" className="field" />
+          </label>
+          <label className="block">
+            <span className="label">Keep for (then it is deleted; you can change this later)</span>
+            <select name="keep_months" defaultValue={DEFAULT_KEEP_MONTHS} className="field">
+              {KEEP_OPTIONS.map((o) => (
+                <option key={o.months} value={o.months}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-sm text-muted">Songs are never deleted, only the setlist.</span>
           </label>
           <div className="flex items-center gap-2 border-t border-line pt-4">
             <button type="button" className="btn ml-auto" onClick={() => setOpen(false)}>

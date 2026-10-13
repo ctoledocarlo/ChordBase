@@ -141,11 +141,6 @@ export function SetlistRail({
         <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">
           Setlist · {items.length} {items.length === 1 ? "song" : "songs"}
         </p>
-        {items.length > 1 && (
-          <p className="mb-2 flex items-center gap-1.5 text-xs text-muted">
-            <GripIcon /> Drag a song by its handle to reorder
-          </p>
-        )}
         <ol onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setGap(null); }}>
           {items.map((item, i) => {
             const active = item.id === currentId;
@@ -194,8 +189,8 @@ export function SetlistRail({
                     {deriveSong(item.song.original_key, item.settings).soundingKey || item.song.original_key}
                   </span>
                 </button>
-                <span className="flex flex-none opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-70">
-                  <button type="button" className="btn btn-quiet btn-icon" onClick={() => onRemove(item.id)} aria-label={`Remove ${item.song.title}`} title="Remove">
+                <span className="ml-1 flex flex-none">
+                  <button type="button" className="btn btn-icon border-[#dc2626] text-[#dc2626] hover:!bg-[#dc2626] hover:!text-white" onClick={() => onRemove(item.id)} aria-label={`Remove ${item.song.title}`} title="Remove">
                     <TrashIcon />
                   </button>
                 </span>

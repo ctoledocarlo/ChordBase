@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeSettings } from "./setlist-settings";
 import type { PresetSettings } from "./songs";
 
-export type Setlist = { id: string; name: string; service_date: string | null };
+export type Setlist = { id: string; name: string; service_date: string | null; expires_at: string };
 
 export type SetlistSummary = Setlist & { songCount: number };
 
@@ -52,9 +52,11 @@ function sanitizeSearch(q: string): string {
 /** Setlists for the church: upcoming ones first (soonest first), then the past (latest first). */
 export async function listSetlists(query?: string): Promise<{ upcoming: SetlistSummary[]; past: SetlistSummary[] }> {
   const supabase = await createClient();
+  // Setlists past their expiry are removed here, the next time anyone looks at the list.
+  await supabase.from("setlists").delete().lt("expires_at", new Date().toISOString());
   let req = supabase
     .from("setlists")
-    .select("id, name, service_date, setlist_items(count)")
+    .select("id, name, service_date, expires_at, setlist_items(count)")
     .order("service_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
   const q = query ? sanitizeSearch(query) : "";
@@ -65,6 +67,7 @@ export async function listSetlists(query?: string): Promise<{ upcoming: SetlistS
     id: r.id,
     name: r.name,
     service_date: r.service_date,
+    expires_at: r.expires_at,
     songCount: r.setlist_items?.[0]?.count ?? 0,
   }));
 
@@ -81,8 +84,9 @@ export async function getSetlist(id: string): Promise<{ setlist: Setlist; items:
   const supabase = await createClient();
   const { data: setlist } = await supabase
     .from("setlists")
-    .select("id, name, service_date")
+    .select("id, name, service_date, expires_at")
     .eq("id", id)
+    .gt("expires_at", new Date().toISOString())
     .maybeSingle<Setlist>();
   if (!setlist) return null;
 

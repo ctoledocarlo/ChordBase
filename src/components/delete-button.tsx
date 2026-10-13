@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { TrashIcon } from "./icons";
 import { Modal } from "./modal";
 
 /** A red Delete button that asks first. `action` is the server action that does the deleting. */
@@ -9,23 +10,38 @@ export function DeleteButton({
   id,
   title,
   message,
+  compact = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   id: string;
   /** The dialog's title, e.g. "Delete this setlist?" */
   title: string;
   message: string;
+  /** A small trash icon instead of the full-width red button (for list rows). */
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="btn w-full border-[#dc2626] bg-[#dc2626] font-medium text-white hover:!bg-[#b91c1c]"
-      >
-        Delete
-      </button>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`Delete: ${title}`}
+          title="Delete"
+          className="btn btn-quiet btn-icon hover:!text-[#dc2626]"
+        >
+          <TrashIcon />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="btn w-full border-[#dc2626] bg-[#dc2626] font-medium text-white hover:!bg-[#b91c1c]"
+        >
+          Delete
+        </button>
+      )}
       <Modal open={open} title={title} onClose={() => setOpen(false)}>
         <form action={action} className="space-y-5">
           <input type="hidden" name="id" value={id} />

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentChurch } from "@/lib/church";
+import { DEFAULT_KEEP_MONTHS, expiryFrom, isKeepMonths } from "@/lib/setlist-expiry";
 import { defaultSettings, validSettings } from "@/lib/setlist-settings";
 import { ITEM_COLUMNS, toItem, type SetlistItem } from "@/lib/setlists";
 import type { PresetSettings } from "@/lib/songs";
@@ -31,11 +32,13 @@ export async function createSetlist(formData: FormData) {
   const name = text(formData, "name").trim().slice(0, 80);
   const date = parseDate(text(formData, "service_date"));
   if (!name || date === undefined) redirect("/setlists");
+  const keep = Number(text(formData, "keep_months")) || DEFAULT_KEEP_MONTHS;
+  if (!isKeepMonths(keep)) redirect("/setlists");
 
   const supabase = await createClient();
   const { data } = await supabase
     .from("setlists")
-    .insert({ church_id: church.id, name, service_date: date })
+    .insert({ church_id: church.id, name, service_date: date, expires_at: expiryFrom(keep).toISOString() })
     .select("id")
     .single<{ id: string }>();
   if (!data) redirect("/setlists");
@@ -44,7 +47,61 @@ export async function createSetlist(formData: FormData) {
   redirect(`/setlists/${data.id}`);
 }
 
-export async function updateSetlist(id: string, name: string, serviceDate: string): Promise<SetlistResult> {
+/** Makes a new setlist and puts a song in it, for the "Add to setlist" button on a song. */
+export async function createSetlistWithSong(
+  name: string,
+  serviceDate: string,
+  songId: string,
+  keepMonths: number = DEFAULT_KEEP_MONTHS,
+): Promise<{ setlistId?: string; error?: string }> {
+  const church = await getCurrentChurch();
+  if (!church) return { error: NOT_SIGNED_IN };
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > 80) return { error: "Give the setlist a short name." };
+  const date = parseDate(serviceDate);
+  if (date === undefined) return { error: "That date isn't valid." };
+  if (!isKeepMonths(keepMonths)) return { error: "A setlist can be kept for up to a year." };
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("setlists")
+    .insert({
+      church_id: church.id,
+      name: trimmed,
+      service_date: date,
+      expires_at: expiryFrom(keepMonths).toISOString(),
+    })
+    .select("id")
+    .single<{ id: string }>();
+  if (!data) return { error: "Couldn't create the setlist. Please try again." };
+
+  const added = await addSetlistItem(data.id, songId, null);
+  revalidatePath("/setlists");
+  if (added.error && !added.item) {
+    await supabase.from("setlists").delete().eq("id", data.id);
+    return { error: added.error };
+  }
+  return { setlistId: data.id };
+}
+
+/** Puts a song at the end of an existing setlist. */
+export async function addSongToSetlist(setlistId: string, songId: string): Promise<SetlistResult> {
+  const added = await addSetlistItem(setlistId, songId, null);
+  if (!added.item) return { error: added.error ?? "Couldn't add that song." };
+  revalidatePath("/setlists");
+  return {};
+}
+
+/**
+ * Saves a setlist's name and date. `keepMonths` re-sets how long it is kept, counted from
+ * today (1 month up to 1 year); leave it null to keep the current expiry.
+ */
+export async function updateSetlist(
+  id: string,
+  name: string,
+  serviceDate: string,
+  keepMonths: number | null = null,
+): Promise<SetlistResult & { expires_at?: string }> {
   const church = await getCurrentChurch();
   if (!church) return { error: NOT_SIGNED_IN };
   const trimmed = name.trim();
@@ -53,10 +110,13 @@ export async function updateSetlist(id: string, name: string, serviceDate: strin
   if (date === undefined) return { error: "That date isn't valid." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("setlists").update({ name: trimmed, service_date: date }).eq("id", id);
+  if (keepMonths !== null && !isKeepMonths(keepMonths)) return { error: "A setlist can be kept for up to a year." };
+  const fields: { name: string; service_date: string | null; expires_at?: string } = { name: trimmed, service_date: date };
+  if (keepMonths !== null) fields.expires_at = expiryFrom(keepMonths).toISOString();
+  const { error } = await supabase.from("setlists").update(fields).eq("id", id);
   if (error) return { error: "Couldn't save. Please try again." };
   revalidatePath("/setlists");
-  return {};
+  return { expires_at: fields.expires_at };
 }
 
 export async function deleteSetlist(formData: FormData) {
