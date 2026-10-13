@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Suspense, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { BackLink } from "./back-link";
 import { CloseIcon, MenuIcon } from "./icons";
+import { Logo } from "./logo";
 import { SIDEBAR_SLOT_ID } from "./sidebar-portal";
 import {
   SIDEBAR_DEFAULT,
@@ -56,7 +57,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
       <header className="sticky top-0 z-20 border-b border-line bg-background">
         <div className="flex h-14 items-stretch gap-6 px-4 lg:px-6">
           <Link href="/" className="flex items-center text-base font-semibold tracking-tight">
-            ChordBase
+            <Logo size={26} />
           </Link>
           <Suspense fallback={null}>
             <MainNav />

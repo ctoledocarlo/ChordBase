@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { ChordSheetArt } from "@/components/chord-sheet-art";
 
 export const metadata: Metadata = {
@@ -27,7 +28,7 @@ export default function WelcomePage() {
       />
 
       <header className="page-enter relative mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-        <span className="text-lg font-semibold tracking-tight">ChordBase</span>
+        <Logo size={30} className="text-lg" />
         <Link
           href="/login"
           className="rounded-md border border-white/20 px-4 py-1.5 text-sm font-medium transition-colors hover:bg-white/10"
@@ -149,7 +150,7 @@ export default function WelcomePage() {
 
       <footer className="relative border-t border-white/10">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-sm text-zinc-500">
-          <span>ChordBase</span>
+          <Logo size={20} className="text-sm" />
           <span>Lyrics and chords for your church.</span>
         </div>
       </footer>

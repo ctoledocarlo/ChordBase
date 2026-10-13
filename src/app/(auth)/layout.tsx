@@ -1,3 +1,4 @@
+import { Logo } from "@/components/logo";
 import { ChordSheetArt } from "@/components/chord-sheet-art";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -16,7 +17,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           aria-hidden
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(60rem_40rem_at_0%_0%,rgba(96,165,250,0.18),transparent_60%),radial-gradient(40rem_30rem_at_100%_100%,rgba(96,165,250,0.08),transparent_60%)]"
         />
-        <p className="relative text-lg font-semibold tracking-tight">ChordBase</p>
+        <Logo size={30} className="relative text-lg" />
 
         <div className="relative">
           <h2 className="anim-rise max-w-md text-4xl font-semibold leading-tight tracking-tight">
@@ -43,7 +44,7 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
           <ThemeToggle />
         </div>
         <div className="w-full max-w-sm">
-          <p className="mb-6 text-xl font-semibold tracking-tight lg:hidden">ChordBase</p>
+          <Logo size={30} className="mb-6 text-xl lg:hidden" />
           <div className="anim-rise rounded-2xl border border-white/70 bg-white/55 p-8 shadow-[0_10px_40px_-12px_rgba(30,50,120,0.25)] backdrop-blur-md dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none">
             {children}
           </div>
