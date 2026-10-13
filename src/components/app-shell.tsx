@@ -172,7 +172,8 @@ function backFallback(pathname: string): string {
 /** The way back, shown at the top of the sidebar on pages that have one. */
 function PageBack() {
   const pathname = usePathname();
-  return <BackLink fallback={backFallback(pathname)} />;
+  // The song list is a main page, so there is nowhere "back" to go from it.
+  return pathname === "/" ? null : <BackLink fallback={backFallback(pathname)} />;
 }
 
 /** Pages without a sidebar (the import page) show the way back at the top of the page instead. */
@@ -184,5 +185,5 @@ function PageTopBack() {
 /** Only pages that put something in the sidebar get one: the song pages and the editor. */
 function SidebarGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  return (pathname.startsWith("/songs/") && pathname !== "/songs/import") || pathname.startsWith("/setlists/") ? <>{children}</> : null;
+  return pathname === "/" || (pathname.startsWith("/songs/") && pathname !== "/songs/import") || pathname.startsWith("/setlists/") ? <>{children}</> : null;
 }

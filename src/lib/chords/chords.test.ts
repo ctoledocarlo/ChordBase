@@ -3,6 +3,7 @@ import {
   bassNote,
   chordsInSong,
   formatChord,
+  isValidChord,
   parseChord,
   parseChordPro,
   parseLyricLine,
@@ -155,5 +156,20 @@ describe("transposeChordPro", () => {
   });
   it("round-trips through a full octave", () => {
     expect(transposeChordPro(SONG, 12, "sharp")).toBe(SONG);
+  });
+});
+
+describe("several chords over one spot", () => {
+  it("counts them as valid when each one is", () => {
+    expect(isValidChord("G D")).toBe(true);
+    expect(isValidChord("A7 D")).toBe(true);
+    expect(isValidChord("Em A7 D")).toBe(true);
+    expect(isValidChord("G Xyz")).toBe(false);
+  });
+
+  it("transposes each of them", () => {
+    expect(transposeChordText("G D", 2, "sharp")).toBe("A E");
+    expect(transposeChordText("Em A7 D", 2, "sharp")).toBe("F#m B7 E");
+    expect(transposeChordPro("[G D]hello", 2, "sharp")).toBe("[A E]hello");
   });
 });

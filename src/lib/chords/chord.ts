@@ -62,9 +62,13 @@ export function parseChord(text: string): Chord | null {
 /** Quality part of a chord: optional m/maj/dim/aug, a number, then sus/add/alteration extras. */
 const QUALITY_RE = /^(?:maj|min|dim|aug|m|M|ø|°|\+|-)?\d{0,2}(?:sus[24]?|add\d{1,2}|no\d|[#b+-]\d{1,2}|\([^)]*\))*$/;
 
-/** True for chords the app can transpose, plus "N.C." (no chord). */
+/**
+ * True for chords the app can transpose, plus "N.C." (no chord). Two or more chords
+ * written together over one spot ("G D", "A7 D") count too, when each of them is valid.
+ */
 export function isValidChord(text: string): boolean {
   const t = text.trim();
+  if (/\s/.test(t)) return t.split(/\s+/).every(isValidChord);
   if (/^N\.?C\.?$/i.test(t)) return true;
   const chord = parseChord(t);
   if (!chord) return false;
@@ -122,6 +126,10 @@ export function transposeChord(chord: Chord, semitones: number, spelling: Spelli
 
 /** Transposes chord text; returns the input unchanged if it is not a chord. */
 export function transposeChordText(text: string, semitones: number, spelling: Spelling): string {
+  // Several chords over one spot ("G D"): move each one.
+  if (/\S\s+\S/.test(text.trim())) {
+    return text.trim().split(/(\s+)/).map((part) => (/\s/.test(part) ? part : transposeChordText(part, semitones, spelling))).join("");
+  }
   const chord = parseChord(text);
   return chord ? formatChord(transposeChord(chord, semitones, spelling)) : text;
 }

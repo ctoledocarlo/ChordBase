@@ -8,6 +8,7 @@ export function SearchForm({
   label,
   placeholder,
   disabled = false,
+  keep = [],
 }: {
   /** The page to search, e.g. "/". */
   action: string;
@@ -15,9 +16,14 @@ export function SearchForm({
   label: string;
   placeholder: string;
   disabled?: boolean;
+  /** Other query values to carry along when searching (such as the filters), as [name, value]. */
+  keep?: [string, string][];
 }) {
   return (
     <form action={action} role="search" className="mt-5">
+      {keep.map(([name, value], i) => (
+        <input key={i} type="hidden" name={name} value={value} />
+      ))}
       <input
         type="search"
         name="q"

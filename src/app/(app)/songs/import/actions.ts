@@ -33,8 +33,7 @@ function problemWith(item: ImportItem): string | null {
   if (!/^\d{1,2}\/\d{1,2}$/.test(item.timeSignature)) return "The time signature isn't valid.";
   if (!Number.isInteger(item.capo) || item.capo < 0 || item.capo > 12) return "The capo should be from 0 to 12.";
   if (typeof item.body !== "string" || item.body.length > 200_000) return "The song text is too long.";
-  const bad = [...new Set([...item.body.matchAll(/\[([^\]]*)\]/g)].map((m) => m[1].trim()).filter((c) => !isValidChord(c)))];
-  if (bad.length > 0) return `Chords that can't be transposed: ${bad.join(", ")}.`;
+  // Chords we can't transpose are still imported as they are; they just stay put when the key changes.
   return null;
 }
 
