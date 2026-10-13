@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { DeleteButton } from "@/components/delete-button";
 import { SongView } from "@/components/song-view";
-import { getSong, listPresets } from "@/lib/songs";
+import { getSong } from "@/lib/songs";
 import { deleteSong } from "../actions";
 
 export default function SongPage({ params }: PageProps<"/songs/[id]">) {
@@ -15,31 +15,25 @@ export default function SongPage({ params }: PageProps<"/songs/[id]">) {
 
 async function Song({ params }: { params: PageProps<"/songs/[id]">["params"] }) {
   const { id } = await params;
-  const [song, presets] = await Promise.all([getSong(id), listPresets(id)]);
+  const song = await getSong(id);
   if (!song) notFound();
 
   // The song itself is shown by SongView, laid out the same as the editor's Preview tab.
   return (
     <SongView
-      songId={song.id}
       title={song.title}
       tempo={song.tempo}
       originalKey={song.original_key}
       defaultCapo={song.default_capo}
       body={song.body}
-      presets={presets}
+      editHref={`/songs/${song.id}/edit`}
       actions={
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-5">
-          <Link href={`/songs/${song.id}/edit`} className="btn btn-primary">
-            Edit song
-          </Link>
-          <form action={deleteSong}>
-            <input type="hidden" name="id" value={song.id} />
-            <button type="submit" className="text-sm text-danger hover:underline">
-              Delete
-            </button>
-          </form>
-        </div>
+        <DeleteButton
+          action={deleteSong}
+          id={song.id}
+          title="Delete this song?"
+          message={`“${song.title}” will be deleted from your library, and removed from any setlist it's in. This can't be undone.`}
+        />
       }
     />
   );

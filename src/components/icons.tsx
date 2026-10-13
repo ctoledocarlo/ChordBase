@@ -87,6 +87,16 @@ export const BackIcon = () => (
     <path d="M13 8H3M7 4 3 8l4 4" />
   </Icon>
 );
+export const GripIcon = () => (
+  <Icon>
+    <circle cx="6" cy="4" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="4" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="6" cy="8" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="8" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="6" cy="12" r="0.9" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="12" r="0.9" fill="currentColor" stroke="none" />
+  </Icon>
+);
 export const ChevronIcon = () => (
   <Icon>
     <path d="m4 6 4 4 4-4" />

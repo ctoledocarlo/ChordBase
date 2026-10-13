@@ -14,16 +14,19 @@ export function SongScreen({
   sections,
   renderLines,
   onMove,
+  fill = false,
 }: {
   info: Pick<SongInfo, "title" | "key" | "tempo">;
   size: number | "fit";
   sections: EditorSection[];
   renderLines: (section: EditorSection) => ReactNode;
   onMove?: (id: string, target: DropTarget) => void;
+  /** Take the height of the parent instead of the page minus the navbar (live mode). */
+  fill?: boolean;
 }) {
   const meta = [info.key && `Key of ${info.key}`, info.tempo && `${info.tempo} BPM`].filter(Boolean);
   return (
-    <div className={`flex flex-col ${SCREEN_HEIGHT}`}>
+    <div className={`flex flex-col ${fill ? "h-full" : SCREEN_HEIGHT}`}>
       <header className="mb-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-line pb-3">
         <h1 className="text-2xl font-semibold tracking-tight">{info.title || "Untitled song"}</h1>
         {meta.length > 0 && <p className="text-muted">{meta.join("   ·   ")}</p>}
@@ -46,6 +49,7 @@ export function PreviewTab({
   size,
   showChords = true,
   onMove,
+  fill,
 }: {
   info: Pick<SongInfo, "title" | "key" | "tempo">;
   sections: EditorSection[];
@@ -53,9 +57,11 @@ export function PreviewTab({
   showChords?: boolean;
   /** Makes the sections draggable; leave it out for a read-only screen. */
   onMove?: (id: string, target: DropTarget) => void;
+  fill?: boolean;
 }) {
   return (
     <SongScreen
+      fill={fill}
       info={info}
       size={size}
       sections={sections}

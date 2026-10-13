@@ -19,7 +19,7 @@ export function BackLink({ fallback, label = "Back" }: { fallback: string; label
           router.back();
         }
       }}
-      className="btn btn-quiet -ml-2 mb-4 inline-flex"
+      className="btn btn-quiet -ml-2 mb-3 inline-flex"
     >
       <BackIcon /> {label}
     </Link>

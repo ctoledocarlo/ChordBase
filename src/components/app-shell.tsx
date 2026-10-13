@@ -93,6 +93,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
                   <CloseIcon />
                 </button>
               </div>
+              <PageBack />
               <div id={SIDEBAR_SLOT_ID} className="space-y-6" />
             </div>
 
@@ -121,7 +122,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
 
         <main className="min-w-0 flex-1 px-4 py-8 lg:px-10">
           <Suspense fallback={null}>
-            <PageBack />
+            <PageTopBack />
           </Suspense>
           {children}
         </main>
@@ -133,7 +134,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
 function MainNav() {
   const pathname = usePathname();
   const items = [
-    { href: "/setlists", label: "Setlists", soon: true, active: pathname.startsWith("/setlists") },
+    { href: "/setlists", label: "Setlists", soon: false, active: pathname.startsWith("/setlists") },
     { href: "/", label: "Songs", soon: false, active: pathname === "/" || pathname.startsWith("/songs") },
   ];
   return (
@@ -161,17 +162,27 @@ function MainNav() {
   );
 }
 
-/** Every page except the two main ones gets a way back, to the page it came from. */
+/** Where "Back" goes when there is no earlier page. */
+function backFallback(pathname: string): string {
+  const edit = pathname.match(/^\/songs\/([^/]+)\/edit$/);
+  if (edit) return `/songs/${edit[1]}`;
+  return pathname.startsWith("/setlists/") ? "/setlists" : "/";
+}
+
+/** The way back, shown at the top of the sidebar on pages that have one. */
 function PageBack() {
   const pathname = usePathname();
-  if (pathname === "/" || pathname === "/setlists") return null;
-  const edit = pathname.match(/^\/songs\/([^/]+)\/edit$/);
-  const fallback = edit ? `/songs/${edit[1]}` : pathname.startsWith("/setlists") ? "/setlists" : "/";
-  return <BackLink fallback={fallback} />;
+  return <BackLink fallback={backFallback(pathname)} />;
+}
+
+/** Pages without a sidebar (the import page) show the way back at the top of the page instead. */
+function PageTopBack() {
+  const pathname = usePathname();
+  return pathname === "/songs/import" ? <BackLink fallback="/" /> : null;
 }
 
 /** Only pages that put something in the sidebar get one: the song pages and the editor. */
 function SidebarGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  return pathname.startsWith("/songs/") && pathname !== "/songs/import" ? <>{children}</> : null;
+  return (pathname.startsWith("/songs/") && pathname !== "/songs/import") || pathname.startsWith("/setlists/") ? <>{children}</> : null;
 }

@@ -167,7 +167,7 @@ export function importDeck(fileName: string, data: Uint8Array): ImportedSong[] {
       warnings.push(`A note on the slide was not imported: ${note}`);
     }
     if (first.chordCount === 0) warnings.push("No chords were found. It will be imported as lyrics only.");
-    if (first.keySource === "guessed") warnings.push(`The key (${first.key}) was guessed from the chords. Check it.`);
+    if (first.keySource === "guessed") warnings.push(`The key (${first.key}) was guessed from the chords.`);
     const unnamed = first.sections.filter((s) => s.label === UNNAMED).length;
     if (unnamed > 0) {
       warnings.push(`${unnamed} ${unnamed === 1 ? "section has" : "sections have"} no name on the slide.`);
