@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { DeleteButton } from "@/components/delete-button";
 import { NewSetlist } from "@/components/new-setlist";
+import { SetlistDateRange } from "@/components/setlist-date-range";
 import { SearchForm } from "@/components/search-form";
 import { getCurrentChurch } from "@/lib/church";
 import { deleteSetlist } from "./actions";
@@ -20,9 +21,14 @@ async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">
   const church = await getCurrentChurch();
   if (!church) return null;
 
-  const raw = (await searchParams).q;
-  const q = (Array.isArray(raw) ? raw[0] : raw) ?? "";
-  const { upcoming, past } = await listSetlists(q);
+  const params = await searchParams;
+  const one = (v: string | string[] | undefined) => ((Array.isArray(v) ? v[0] : v) ?? "").trim();
+  const day = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");
+  const q = one(params.q).slice(0, 100);
+  const from = day(one(params.from));
+  const to = day(one(params.to));
+  const { upcoming, past } = await listSetlists(q, { from, to });
+  const narrowed = q !== "" || from !== "" || to !== "";
   const total = upcoming.length + past.length;
 
   return (
@@ -31,16 +37,23 @@ async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Setlists</h1>
           <p className="mt-1 text-sm text-muted">
-            {q ? `${total} matching “${q}”` : `${total} ${total === 1 ? "setlist" : "setlists"}`}
+            {narrowed ? `${total} matching` : `${total} ${total === 1 ? "setlist" : "setlists"}`}
           </p>
         </div>
         <NewSetlist />
       </div>
 
-      <SearchForm action="/setlists" q={q} label="Search setlists" placeholder="Search setlists" />
+      <SearchForm
+        action="/setlists"
+        q={q}
+        keep={[...(from ? [["from", from]] : []), ...(to ? [["to", to]] : [])] as [string, string][]}
+        label="Search setlists by name or date"
+        placeholder="Search by name or date, like “Oct 17” or “2026-10-17”"
+      />
+      <SetlistDateRange q={q} from={from} to={to} />
 
       {total === 0 ? (
-        <p className="mt-10 text-muted">{q ? "Nothing matches that search." : "No setlists yet. Create your first one."}</p>
+        <p className="mt-10 text-muted">{narrowed ? "Nothing matches that. Try a different name or date." : "No setlists yet. Create your first one."}</p>
       ) : (
         <>
           <Group title="Upcoming" rows={upcoming} />

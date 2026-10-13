@@ -50,7 +50,7 @@ function Form({
   children: ReactNode;
 }) {
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} className="space-y-5">
       {children}
       {state.error && (
         <p role="alert" className="text-sm text-danger">
@@ -65,7 +65,7 @@ function Form({
       <button
         type="submit"
         disabled={pending}
-        className="btn btn-primary w-full py-2"
+        className="btn btn-primary w-full py-2.5 text-[0.9375rem]"
       >
         {pending ? "Please wait…" : submitLabel}
       </button>
@@ -84,8 +84,8 @@ export function LoginForm() {
         type="password"
         autoComplete="current-password"
       />
-      <p className="text-sm">
-        <Link href="/forgot-password" className="underline">
+      <p className="text-sm text-muted">
+        <Link href="/forgot-password" className="underline hover:text-foreground">
           Forgot your password?
         </Link>
       </p>

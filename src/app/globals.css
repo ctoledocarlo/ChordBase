@@ -180,3 +180,73 @@ body {
     outline: none;
   }
 }
+
+/*
+ * Motion. Small and quick, there to guide the eye rather than to be noticed.
+ * Everything is switched off for people who ask their device for less motion.
+ */
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+}
+
+/* A page fades in when you move to it. Opacity only, so fixed-position screens (live mode) aren't affected. */
+.page-enter {
+  animation: fade 0.25s ease-out;
+}
+
+/* Elements that settle into place on load; stagger them with animation-delay. */
+.anim-rise {
+  animation: rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Sections that settle into place as they scroll into view (where the browser supports it). */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 30%;
+  }
+}
+
+/* Dialogs ease in, and the dimmed background fades. */
+dialog[open] {
+  animation: pop 0.18s ease-out;
+}
+dialog[open]::backdrop {
+  animation: fade 0.18s ease-out;
+}
+
+.btn,
+.field {
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-timeline: auto !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

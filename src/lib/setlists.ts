@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { setlistMatches } from "./setlist-search";
 import { normalizeSettings } from "./setlist-settings";
 import type { PresetSettings } from "./songs";
 
@@ -45,12 +46,16 @@ export function toItem(row: ItemRow): SetlistItem | null {
   };
 }
 
-function sanitizeSearch(q: string): string {
-  return q.replace(/[,()*%_\\]/g, " ").trim();
-}
-
-/** Setlists for the church: upcoming ones first (soonest first), then the past (latest first). */
-export async function listSetlists(query?: string): Promise<{ upcoming: SetlistSummary[]; past: SetlistSummary[] }> {
+/**
+ * Setlists for the church: upcoming ones first (soonest first), then the past (latest first).
+ * `query` matches a setlist's name or its date (see setlistMatches); `range` limits it to
+ * setlists whose service date falls between two dates ("2026-10-01"). Setlists are few and
+ * expire within a year, so the text matching is done here rather than in the database.
+ */
+export async function listSetlists(
+  query?: string,
+  range?: { from?: string; to?: string },
+): Promise<{ upcoming: SetlistSummary[]; past: SetlistSummary[] }> {
   const supabase = await createClient();
   // Setlists past their expiry are removed here, the next time anyone looks at the list.
   await supabase.from("setlists").delete().lt("expires_at", new Date().toISOString());
@@ -58,9 +63,10 @@ export async function listSetlists(query?: string): Promise<{ upcoming: SetlistS
     .from("setlists")
     .select("id, name, service_date, expires_at, setlist_items(count)")
     .order("service_date", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false });
-  const q = query ? sanitizeSearch(query) : "";
-  if (q) req = req.ilike("name", `%${q}%`);
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (range?.from) req = req.gte("service_date", range.from);
+  if (range?.to) req = req.lte("service_date", range.to);
   const { data } = await req;
 
   const rows = ((data as unknown as (Setlist & { setlist_items: { count: number }[] })[] | null) ?? []).map((r) => ({
@@ -69,7 +75,7 @@ export async function listSetlists(query?: string): Promise<{ upcoming: SetlistS
     service_date: r.service_date,
     expires_at: r.expires_at,
     songCount: r.setlist_items?.[0]?.count ?? 0,
-  }));
+  })).filter((r) => setlistMatches(query ?? "", r.name, r.service_date));
 
   const today = new Date().toISOString().slice(0, 10);
   // No date means "not scheduled yet", which is as relevant as an upcoming one.

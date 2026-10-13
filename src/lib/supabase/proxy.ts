@@ -4,7 +4,7 @@ import { supabaseEnv } from "./env";
 
 // Reachable without being signed in. /auth/confirm exchanges the emailed
 // reset-link token for a session, so it must be open.
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm"];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm", "/welcome"];
 // Signed-in users have no reason to see these.
 const GUEST_ONLY_PATHS = ["/login", "/forgot-password"];
 
@@ -13,7 +13,7 @@ const matches = (pathname: string, paths: string[]) =>
 
 /**
  * Refreshes the Supabase session cookies and applies route protection:
- * signed-out visitors go to /login, signed-in visitors skip the login pages.
+ * signed-out visitors see the landing page (or go to /login), signed-in visitors skip the login pages.
  * (Pages and actions still check access themselves; this is the first gate.)
  */
 export async function updateSession(request: NextRequest) {
@@ -49,6 +49,12 @@ export async function updateSession(request: NextRequest) {
     return redirect;
   };
 
+  // Signed-out visitors to the front door see the landing page, at the same address.
+  if (!signedIn && pathname === "/") {
+    const landing = NextResponse.rewrite(new URL("/welcome", request.url));
+    for (const cookie of response.cookies.getAll()) landing.cookies.set(cookie);
+    return landing;
+  }
   if (!signedIn && !matches(pathname, PUBLIC_PATHS)) {
     return redirectTo("/login");
   }

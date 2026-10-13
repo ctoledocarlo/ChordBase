@@ -11,8 +11,8 @@ export default function ForgotPasswordPage({
   return (
     <>
       <BackLink fallback="/login" label="Back to sign in" />
-      <h1 className="mb-1 text-lg font-semibold">Reset your password</h1>
-      <p className="mb-4 text-sm text-muted">
+      <h1 className="text-3xl font-semibold tracking-tight">Reset your password</h1>
+      <p className="mb-8 mt-2 text-muted">
         We&apos;ll email a link to choose a new password.
       </p>
       <Suspense>
