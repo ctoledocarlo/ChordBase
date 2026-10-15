@@ -14,6 +14,8 @@ export type MergeResult = {
 
 const same = (a: SetlistItem, b: SetlistItem) =>
   a.body_override === b.body_override &&
+  a.transition.mode === b.transition.mode &&
+  a.transition.chords === b.transition.chords &&
   JSON.stringify(a.settings) === JSON.stringify(b.settings) &&
   JSON.stringify(a.song) === JSON.stringify(b.song);
 

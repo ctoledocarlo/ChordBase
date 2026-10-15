@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { transitionDisplay } from "@/lib/setlist-transition";
 import type { SetlistItem } from "@/lib/setlists";
 import type { SongSummary } from "@/lib/songs";
 import { GripIcon, PlayIcon, PlusIcon, TrashIcon } from "./icons";
@@ -20,7 +21,7 @@ export function SetlistRail({
   items,
   currentId,
   activeId,
-  library,
+  onSearch,
   busy,
   error,
   onSelect,
@@ -38,6 +39,7 @@ export function SetlistRail({
   highlightIds,
   keyControl,
   chat,
+  reference,
 }: {
   role: ScreenRole;
   items: SetlistItem[];
@@ -45,7 +47,8 @@ export function SetlistRail({
   currentId: string | null;
   /** The song on stage. */
   activeId: string | null;
-  library: SongSummary[];
+  /** Finds songs by title, artist or words for the "Add a song" box. */
+  onSearch: (query: string) => Promise<SongSummary[]>;
   busy: boolean;
   error: string | null;
   onSelect: (id: string) => void;
@@ -68,6 +71,8 @@ export function SetlistRail({
   keyControl?: ReactNode;
   /** The session chat, shown under the list. */
   chat?: ReactNode;
+  /** A quick reference shown between what is on stage and the list (the chords in the key). */
+  reference?: ReactNode;
 }) {
   const media = role === "media";
   // Stage screens choose what they are looking at themselves; Viewer screens only watch.
@@ -95,64 +100,78 @@ export function SetlistRail({
   const viewIndex = items.findIndex((i) => i.id === currentId);
   const anchor = media || viewIndex < 0 ? stageIndex : viewIndex;
   const next = anchor >= 0 ? items[anchor + 1] : undefined;
+  // How the song being looked at leads into the next one.
+  const bridge = anchor >= 0 && next ? transitionDisplay(items[anchor], next) : null;
   const awayFromStage = role === "stage" && currentId !== null && currentId !== activeId;
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return library
-      .filter((s) => s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q))
-      .slice(0, MAX_RESULTS);
-  }, [query, library]);
+  // Songs found for what was typed. Asks the server a moment after typing stops.
+  const [found, setFound] = useState<SongSummary[]>([]);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      void onSearch(q).then((songs) => {
+        if (!stale) setFound(songs);
+      });
+    }, 200);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [query, onSearch]);
+  const results = query.trim().length < 2 ? [] : found.slice(0, MAX_RESULTS);
 
   const total = ROLES.reduce((n, r) => n + (roles[r.value] ?? 0), 0);
   const who = ROLES.filter((r) => (roles[r.value] ?? 0) > 0).map((r) => `${roles[r.value]} ${r.label}`);
 
   return (
     <aside aria-label="Setlist" className="flex h-full min-h-0 flex-col border-line lg:border-l lg:pl-4">
-      <p
-        role="status"
-        className="mb-2 flex flex-none items-center gap-2 text-xs text-muted"
-        title="Changes made on other screens showing this setlist appear here as they happen"
-      >
-        <span
-          aria-hidden
-          className={`h-2 w-2 flex-none rounded-full ${status === "live" ? "bg-[#16a34a]" : status === "offline" ? "bg-[#d97706]" : "bg-line"}`}
-        />
-        <span className="min-w-0 truncate">
-          {status === "live"
-            ? total > 1
-              ? `Live · ${who.join(" · ")}`
-              : "Live"
-            : status === "offline"
-              ? "Reconnecting…"
-              : "Connecting…"}
-        </span>
-      </p>
+      <div className="mb-1.5 flex flex-none items-center gap-2">
+        <p
+          role="status"
+          className="flex min-w-0 flex-1 items-center gap-1.5 text-xs text-muted"
+          title="Changes made on other screens showing this setlist appear here as they happen"
+        >
+          <span
+            aria-hidden
+            className={`h-2 w-2 flex-none rounded-full ${status === "live" ? "bg-[#16a34a]" : status === "offline" ? "bg-[#d97706]" : "bg-line"}`}
+          />
+          <span className="min-w-0 truncate">
+            {status === "live"
+              ? total > 1
+                ? `Live · ${who.join(" · ")}`
+                : "Live"
+              : status === "offline"
+                ? "Reconnecting…"
+                : "Connecting…"}
+          </span>
+        </p>
+        {media && !live && (
+          <button type="button" className="btn btn-primary flex-none px-2.5 py-0.5 text-[0.8125rem]" onClick={onGoLive} disabled={items.length === 0}>
+            Go live
+          </button>
+        )}
+      </div>
 
       {keyControl}
 
       {media && (
-        <div className="flex-none border-b border-line pb-2">
-          {!live && (
-            <button type="button" className="btn btn-primary mb-2 w-full py-1" onClick={onGoLive} disabled={items.length === 0}>
-              Go live
-            </button>
-          )}
+        <div className="flex-none border-b border-line pb-1.5">
           <input
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Add a song…"
+            placeholder="Add a song (title or lyrics)…"
             aria-label="Search songs to add"
-            className="field field-sm"
+            className="field field-sm py-1"
           />
           {error && (
             <p role="alert" className="mt-2 text-sm text-danger">
               {error}
             </p>
           )}
-          {query.trim() && results.length === 0 && <p className="mt-2 text-sm text-muted">No songs match that.</p>}
+          {query.trim().length >= 2 && results.length === 0 && <p className="mt-2 text-sm text-muted">No songs match that.</p>}
           {results.length > 0 && (
             <ul className="mt-2 divide-y divide-line rounded-md border border-line">
               {results.map((s) => (
@@ -160,6 +179,7 @@ export function SetlistRail({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{s.title}</span>
                     {s.artist && <span className="block truncate text-xs text-muted">{s.artist}</span>}
+                    {s.snippet && <span className="block truncate text-xs italic text-muted">“{s.snippet}”</span>}
                   </span>
                   {items.length > 0 && (
                     <button type="button" className="btn" disabled={busy} onClick={() => onAdd(s.id, "next")} title="Play right after the song on stage">
@@ -176,9 +196,9 @@ export function SetlistRail({
         </div>
       )}
 
-      <div className="flex-none space-y-1 border-b border-line py-2 text-sm">
+      <div className="flex-none space-y-0.5 border-b border-line py-1.5 text-[0.8125rem]">
         <p className="flex items-baseline gap-2">
-          <span className="w-14 flex-none text-[0.6875rem] font-medium uppercase tracking-wide text-muted">On stage</span>
+          <span className="w-12 flex-none text-[0.625rem] font-medium uppercase tracking-wide text-muted">On stage</span>
           {onStage ? (
             <span className="min-w-0 flex-1 truncate font-medium">{onStage.song.title}</span>
           ) : (
@@ -186,7 +206,7 @@ export function SetlistRail({
           )}
         </p>
         <p className="flex items-baseline gap-2">
-          <span className="w-14 flex-none text-[0.6875rem] font-medium uppercase tracking-wide text-muted">Up next</span>
+          <span className="w-12 flex-none text-[0.625rem] font-medium uppercase tracking-wide text-muted">Up next</span>
           {next ? (
             <>
               <span className="min-w-0 flex-1 truncate">{next.song.title}</span>
@@ -197,17 +217,26 @@ export function SetlistRail({
           )}
         </p>
 
+        {bridge && (
+          <p className="flex items-baseline gap-2">
+            <span className="w-12 flex-none text-[0.625rem] font-medium uppercase tracking-wide text-muted" title="Chords to get from the end of this song into the next one">
+              Bridge
+            </span>
+            <span className="min-w-0 flex-1 truncate font-mono text-[0.8125rem] font-semibold text-chord">{bridge}</span>
+          </p>
+        )}
+
         {awayFromStage && (
-          <button type="button" className="btn mt-1 w-full px-2 py-1 text-[0.8125rem]" onClick={onBackToStage}>
+          <button type="button" className="btn mt-1 w-full px-2 py-0.5 text-xs" onClick={onBackToStage}>
             Back to the song on stage
           </button>
         )}
 
         {browse && (
-          <div className="grid grid-cols-2 gap-1.5 pt-1">
+          <div className="grid grid-cols-2 gap-1 pt-1">
             <button
               type="button"
-              className="btn px-2 py-1 text-[0.8125rem]"
+              className="btn px-2 py-0.5 text-xs"
               onClick={onPrev}
               disabled={anchor <= 0}
               title={media ? "Show the previous song on stage" : "Look at the previous song"}
@@ -216,7 +245,7 @@ export function SetlistRail({
             </button>
             <button
               type="button"
-              className="btn btn-primary px-2 py-1 text-[0.8125rem]"
+              className="btn btn-primary px-2 py-0.5 text-xs"
               onClick={onNext}
               disabled={items.length === 0 || (anchor >= 0 && !next)}
               title={media ? "Show the next song on stage" : "Look at the next song"}
@@ -226,6 +255,8 @@ export function SetlistRail({
           </div>
         )}
       </div>
+
+      {reference}
 
       <div className="min-h-0 flex-[3] overflow-y-auto py-2">
         <p className="mb-1 flex items-center justify-between gap-2 text-[0.6875rem] font-medium uppercase tracking-wide text-muted">

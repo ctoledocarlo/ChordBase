@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { setlistMatches } from "./setlist-search";
 import { normalizeSettings } from "./setlist-settings";
+import { DEFAULT_TRANSITION, isTransitionMode, type Transition } from "./setlist-transition";
 import type { PresetSettings } from "./songs";
 
 export type Setlist = {
@@ -31,18 +32,22 @@ export type SetlistItem = {
   settings: PresetSettings;
   /** This setlist's own version of the song's chords and layout, in the song's original key. Null = the song as it is. */
   body_override: string | null;
+  /** How this song leads into the next one in the setlist. */
+  transition: Transition;
   song: SetlistSong;
 };
 
 /** Columns to select for an item together with its song. */
 export const ITEM_COLUMNS =
-  "id, song_id, position, settings, body_override, songs(title, artist, original_key, default_capo, tempo, body)";
+  "id, song_id, position, settings, body_override, transition_mode, transition_chords, songs(title, artist, original_key, default_capo, tempo, body)";
 
 type ItemRow = {
   id: string;
   song_id: string;
   settings: unknown;
   body_override: string | null;
+  transition_mode?: string | null;
+  transition_chords?: string | null;
   songs: SetlistSong | null;
 };
 
@@ -53,6 +58,10 @@ export function toItem(row: ItemRow): SetlistItem | null {
     song_id: row.song_id,
     settings: normalizeSettings(row.settings, row.songs.default_capo),
     body_override: row.body_override,
+    transition: {
+      mode: isTransitionMode(row.transition_mode) ? row.transition_mode : DEFAULT_TRANSITION.mode,
+      chords: row.transition_chords ?? "",
+    },
     song: row.songs,
   };
 }

@@ -1,3 +1,4 @@
+import { isChordStyle } from "./chords/styles";
 import type { PresetSettings } from "./songs";
 
 /** Text size 0 means "fit to screen". */
@@ -5,7 +6,7 @@ export const FIT = 0;
 
 /** How a song starts out in a setlist: original key, its usual capo, chords shown, fit to screen. */
 export function defaultSettings(defaultCapo: number): PresetSettings {
-  return { semitones: 0, capo: defaultCapo, spelling: "auto", showChords: true, fontSize: FIT };
+  return { semitones: 0, capo: defaultCapo, spelling: "auto", showChords: true, fontSize: FIT, style: "original" };
 }
 
 export function validSettings(s: PresetSettings): boolean {
@@ -14,6 +15,7 @@ export function validSettings(s: PresetSettings): boolean {
     Number.isInteger(s.capo) && s.capo >= 0 && s.capo <= 12 &&
     ["auto", "sharp", "flat"].includes(s.spelling) &&
     typeof s.showChords === "boolean" &&
+    (s.style === undefined || isChordStyle(s.style)) &&
     Number.isInteger(s.fontSize) && (s.fontSize === 0 || (s.fontSize >= 12 && s.fontSize <= 40))
   );
 }

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { isValidChord } from "@/lib/chords";
 import { getCurrentChurch } from "@/lib/church";
 import { createClient } from "@/lib/supabase/server";
-import { getSong, type PresetSettings } from "@/lib/songs";
+import { findSongs as findSongsInLibrary, getSong, type PresetSettings, type SongSummary } from "@/lib/songs";
 
 export type SongFormState = { error?: string };
 
@@ -178,4 +178,11 @@ export async function removeChordShortcut(id: string): Promise<ShortcutResult> {
   const supabase = await createClient();
   const { error } = await supabase.from("chord_shortcuts").delete().eq("id", id);
   return error ? { error: "Couldn't remove that chord." } : {};
+}
+
+/** Songs matching what was typed in a search box (title, artist or words), for "add a song" boxes. */
+export async function findSongs(query: string): Promise<SongSummary[]> {
+  const church = await getCurrentChurch();
+  if (!church || typeof query !== "string" || query.length > 100) return [];
+  return findSongsInLibrary(query);
 }

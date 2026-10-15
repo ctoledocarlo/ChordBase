@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bassNote,
+  chordsInKey,
   chordsInSong,
   formatChord,
   isValidChord,
@@ -171,5 +172,29 @@ describe("several chords over one spot", () => {
     expect(transposeChordText("G D", 2, "sharp")).toBe("A E");
     expect(transposeChordText("Em A7 D", 2, "sharp")).toBe("F#m B7 E");
     expect(transposeChordPro("[G D]hello", 2, "sharp")).toBe("[A E]hello");
+  });
+});
+
+describe("the chords in a key", () => {
+  it("lists the seven chords of a major key", () => {
+    expect(chordsInKey("G").map((c) => c.triad)).toEqual(["G", "Am", "Bm", "C", "D", "Em", "F#dim"]);
+    expect(chordsInKey("G").map((c) => c.numeral)).toEqual(["I", "ii", "iii", "IV", "V", "vi", "vii°"]);
+    expect(chordsInKey("C").map((c) => c.seventh)).toEqual(["Cmaj7", "Dm7", "Em7", "Fmaj7", "G7", "Am7", "Bm7b5"]);
+  });
+
+  it("spells flat keys with flats", () => {
+    expect(chordsInKey("F").map((c) => c.triad)).toEqual(["F", "Gm", "Am", "Bb", "C", "Dm", "Edim"]);
+    expect(chordsInKey("Eb")[3].triad).toBe("Ab");
+  });
+
+  it("lists a minor key's chords", () => {
+    expect(chordsInKey("Am").map((c) => c.triad)).toEqual(["Am", "Bdim", "C", "Dm", "Em", "F", "G"]);
+    expect(chordsInKey("Em")[0].numeral).toBe("i");
+  });
+
+  it("can be spelled either way, and gives nothing for a non-key", () => {
+    expect(chordsInKey("C#", "flat")[0].triad).toBe("Db");
+    expect(chordsInKey("")).toEqual([]);
+    expect(chordsInKey("N.C.")).toEqual([]);
   });
 });

@@ -84,7 +84,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
         </div>
       </div>
 
-      <SearchForm action="/" q={filters.q} keep={keep} label="Search songs" placeholder="Search by title or artist" />
+      <SearchForm action="/" q={filters.q} keep={keep} label="Search songs" placeholder="Search by title, artist or lyrics" />
 
       {songs.length === 0 ? (
         <p className="mt-10 text-muted">
@@ -101,6 +101,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{s.title}</span>
                   {s.artist && <span className="block truncate text-sm text-muted">{s.artist}</span>}
+                  {s.snippet && <span className="block truncate text-sm italic text-muted">“{s.snippet}”</span>}
                 </span>
                 {s.tempo && <span className="hidden text-sm tabular-nums text-muted sm:inline">{s.tempo} BPM</span>}
                 <span aria-hidden className="text-muted transition-transform group-hover:translate-x-0.5">

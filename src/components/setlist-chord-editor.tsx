@@ -40,7 +40,8 @@ export function SetlistChordEditor({
   const { original_key: originalKey, title, tempo } = item.song;
   const { shapeShift, keyLabel } = deriveSong(originalKey, item.settings);
   const body = effectiveBody(item);
-  const sections = useSongSections(body, originalKey, item.settings);
+  // Editing always shows the chords as written; a chord style is only for playing from.
+  const sections = useSongSections(body, originalKey, { ...item.settings, style: "original" });
 
   const [editing, setEditingState] = useState<Target | null>(null);
   const editingRef = useRef<Target | null>(null);

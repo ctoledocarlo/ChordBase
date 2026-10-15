@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
+import type { ChordStyle } from "./chords";
+import { lyricSnippet, searchTokens } from "./lyric-search";
 import { PAGE_SIZE, type SongFacets, type SongFilters } from "./song-filters";
 
 export type Song = {
@@ -16,7 +18,10 @@ export type Song = {
   updated_at: string;
 };
 
-export type SongSummary = Pick<Song, "id" | "title" | "artist" | "original_key" | "tempo">;
+export type SongSummary = Pick<Song, "id" | "title" | "artist" | "original_key" | "tempo"> & {
+  /** When a search matched the words of the song (not its title or artist), the line that matched. */
+  snippet?: string;
+};
 
 /** Characters that are special in a PostgREST `or` filter or an ilike pattern. */
 function sanitizeSearch(q: string): string {
@@ -36,6 +41,46 @@ export async function listSongs(query?: string): Promise<SongSummary[]> {
   return data ?? [];
 }
 
+/**
+ * What to match a search against: the title or artist containing what was typed, or the lyrics
+ * containing every word of it. Returns a PostgREST `or` filter, or null for an empty search.
+ */
+function textFilter(query: string): string | null {
+  const q = sanitizeSearch(query);
+  if (!q) return null;
+  const parts = [`title.ilike.%${q}%`, `artist.ilike.%${q}%`];
+  // The tokens are only letters and numbers, so they can't break the filter.
+  const tokens = searchTokens(query);
+  if (tokens.length > 0) parts.push(`and(${tokens.map((t) => `lyrics.ilike.%${t}%`).join(",")})`);
+  return parts.join(",");
+}
+
+/** Adds the line that matched to songs found through their words, and drops the song text. */
+function withSnippets(rows: (SongSummary & { body?: string })[], query: string): SongSummary[] {
+  const q = query.trim().toLowerCase();
+  const tokens = searchTokens(query);
+  return rows.map(({ body, ...song }) => {
+    // A match on the title or artist is obvious; only explain the ones that matched on the words.
+    const named = q !== "" && `${song.title} ${song.artist}`.toLowerCase().includes(q);
+    const snippet = !named && body ? lyricSnippet(body, tokens) : null;
+    return snippet ? { ...song, snippet } : song;
+  });
+}
+
+/** Songs matching what was typed (title, artist or words), best few first. Call it inside <Suspense> or an action. */
+export async function findSongs(query: string, limit = 8): Promise<SongSummary[]> {
+  const filter = textFilter(query);
+  if (!filter) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("songs")
+    .select("id, title, artist, original_key, tempo, body")
+    .or(filter)
+    .order("title", { ascending: true })
+    .limit(limit);
+  return withSnippets((data as (SongSummary & { body?: string })[] | null) ?? [], query);
+}
+
 /** A minor key is a root with an "m" that isn't the start of "maj" (Am, F#m7). */
 const MINOR_KEY = "^[A-G][#b]?m($|[^a])";
 
@@ -48,11 +93,12 @@ export async function searchSongs(f: SongFilters): Promise<SongPage> {
   async function fetchPage(page: number) {
     let req = supabase
       .from("songs")
-      .select("id, title, artist, original_key, tempo", { count: "exact" })
+      // The song text comes along only when searching, to show which line matched.
+      .select(f.q ? "id, title, artist, original_key, tempo, body" : "id, title, artist, original_key, tempo", { count: "exact" })
       .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-    const q = f.q ? sanitizeSearch(f.q) : "";
-    if (q) req = req.or(`title.ilike.%${q}%,artist.ilike.%${q}%`);
+    const filter = f.q ? textFilter(f.q) : null;
+    if (filter) req = req.or(filter);
     if (f.keys.length > 0) req = req.in("original_key", f.keys);
     if (f.artist) req = req.eq("artist", f.artist);
     if (f.mode === "minor") req = req.filter("original_key", "match", MINOR_KEY);
@@ -93,7 +139,8 @@ export async function searchSongs(f: SongFilters): Promise<SongPage> {
     page = pages;
     ({ data } = await fetchPage(page));
   }
-  return { songs: (data as SongSummary[] | null) ?? [], total, page, pages };
+  const rows = (data as unknown as (SongSummary & { body?: string })[] | null) ?? [];
+  return { songs: f.q ? withSnippets(rows, f.q) : rows, total, page, pages };
 }
 
 /** The keys, artists, time signatures and capos that exist, for the filter choices. */
@@ -124,6 +171,8 @@ export type PresetSettings = {
   showChords: boolean;
   /** Text size in pixels; 0 means fit to screen. */
   fontSize: number;
+  /** How the chords are dressed (original, classic, jazzy, gospel). Missing means original. */
+  style?: ChordStyle;
 };
 
 export type Preset = { id: string; name: string; settings: PresetSettings };

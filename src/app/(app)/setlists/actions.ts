@@ -311,3 +311,23 @@ export async function setActiveItem(setlistId: string, itemId: string | null, cl
     .eq("id", setlistId);
   return error ? { error: "Couldn't change the song on stage." } : {};
 }
+
+/** Saves how one song leads into the next: suggested chords, typed-in chords, or none. */
+export async function saveItemTransition(
+  itemId: string,
+  mode: string,
+  chords: string,
+  clientId?: string,
+): Promise<SetlistResult> {
+  const church = await getCurrentChurch();
+  if (!church) return { error: NOT_SIGNED_IN };
+  if (mode !== "auto" && mode !== "manual" && mode !== "none") return { error: "Choose auto, manual or none." };
+  const text = typeof chords === "string" ? chords.trim() : "";
+  if (text.length > 200) return { error: "Keep the transition under 200 characters." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("setlist_items")
+    .update({ transition_mode: mode, transition_chords: text, edited_by: screenId(clientId) })
+    .eq("id", itemId);
+  return error ? { error: "Couldn't save the transition." } : {};
+}

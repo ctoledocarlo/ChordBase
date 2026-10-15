@@ -12,17 +12,21 @@ import {
   reorderSetlistItems,
   saveItemBody,
   saveItemSettings,
+  saveItemTransition,
   setActiveItem,
   updateSetlist,
 } from "@/app/(app)/setlists/actions";
 import { KEEP_OPTIONS, formatDay } from "@/lib/setlist-expiry";
 import { FIT } from "@/lib/setlist-settings";
+import { findSongs } from "@/app/(app)/songs/actions";
 import { effectiveBody } from "@/lib/setlist-body";
 import { mergeRemote } from "@/lib/setlist-sync";
+import type { Transition } from "@/lib/setlist-transition";
 import type { ChatMessage, Setlist, SetlistItem } from "@/lib/setlists";
-import type { ChordShortcut, PresetSettings, SongSummary } from "@/lib/songs";
+import type { ChordShortcut, PresetSettings } from "@/lib/songs";
 import { DeleteButton } from "./delete-button";
 import { PreviewTab } from "./editor-preview";
+import { KeyChords } from "./key-chords";
 import { LiveControls } from "./live-controls";
 import { LiveFrame, useLiveMode } from "./live-mode";
 import { Modal } from "./modal";
@@ -32,6 +36,7 @@ import { SetlistChat } from "./setlist-chat";
 import { SetlistRail } from "./setlist-rail";
 import { SidebarPortal } from "./sidebar-portal";
 import { SongSettingsPanel, deriveSong, useSongSections } from "./song-settings";
+import { TransitionPanel } from "./transition-panel";
 import { useScreenRole } from "./use-screen-role";
 import { newScreenId, useSetlistSync } from "./use-setlist-sync";
 
@@ -46,13 +51,11 @@ export function SetlistPlayer({
   setlist,
   initialItems,
   initialMessages,
-  library,
   shortcuts,
 }: {
   setlist: Setlist;
   initialItems: SetlistItem[];
   initialMessages: ChatMessage[];
-  library: SongSummary[];
   shortcuts: ChordShortcut[];
 }) {
   const [items, setItems] = useState(initialItems);
@@ -102,6 +105,7 @@ export function SetlistPlayer({
   // Media putting a new song on stage brings every Stage screen back to it.
   const viewId = role !== "viewer" && currentId && items.some((i) => i.id === currentId) ? currentId : stageId;
   const current = items.find((i) => i.id === viewId) ?? null;
+  const nextItem = current ? (items[items.findIndex((i) => i.id === current.id) + 1] ?? null) : null;
   // Stage and Viewer screens are always full screen.
   const liveView = live || !media;
 
@@ -111,6 +115,9 @@ export function SetlistPlayer({
   // The same for each song's own version of its chords.
   const bodyTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const bodyPending = useRef(new Map<string, string | null>());
+  // The same for how each song leads into the next.
+  const transTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const transPending = useRef(new Map<string, Transition>());
   // Songs whose changes are on their way to the server right now.
   const savingIds = useRef(new Map<string, number>());
 
@@ -148,6 +155,15 @@ export function SetlistPlayer({
     setSaveNote(res.error ?? "Saved to this setlist");
   }
 
+  async function flushTransition(itemId: string) {
+    const t = transPending.current.get(itemId);
+    if (!t) return;
+    transPending.current.delete(itemId);
+    transTimers.current.delete(itemId);
+    const res = await tracked(itemId, () => saveItemTransition(itemId, t.mode, t.chords, screenId));
+    setSaveNote(res.error ?? "Saved to this setlist");
+  }
+
   async function flushBody(itemId: string) {
     if (!bodyPending.current.has(itemId)) return;
     const body = bodyPending.current.get(itemId) ?? null;
@@ -162,9 +178,13 @@ export function SetlistPlayer({
     const p = pending.current;
     const bt = bodyTimers.current;
     const bp = bodyPending.current;
+    const tt = transTimers.current;
+    const tp = transPending.current;
     return () => {
       for (const timer of t.values()) clearTimeout(timer);
       for (const timer of bt.values()) clearTimeout(timer);
+      for (const timer of tt.values()) clearTimeout(timer);
+      for (const [id, tr] of tp) void saveItemTransition(id, tr.mode, tr.chords, screenId);
       for (const [id, settings] of p) void saveItemSettings(id, settings, screenId);
       for (const [id, body] of bp) void saveItemBody(id, body, screenId);
     };
@@ -176,6 +196,15 @@ export function SetlistPlayer({
     bodyPending.current.set(itemId, body);
     clearTimeout(bodyTimers.current.get(itemId));
     bodyTimers.current.set(itemId, setTimeout(() => void flushBody(itemId), SAVE_DELAY_MS));
+    setSaveNote("Saving…");
+  }
+
+  /** How a song leads into the next one. Shown at once, saved a moment later. */
+  function changeTransition(itemId: string, transition: Transition) {
+    setItems((list) => list.map((i) => (i.id === itemId ? { ...i, transition } : i)));
+    transPending.current.set(itemId, transition);
+    clearTimeout(transTimers.current.get(itemId));
+    transTimers.current.set(itemId, setTimeout(() => void flushTransition(itemId), SAVE_DELAY_MS));
     setSaveNote("Saving…");
   }
 
@@ -284,6 +313,8 @@ export function SetlistPlayer({
     clearTimeout(timers.current.get(id));
     bodyPending.current.delete(id);
     clearTimeout(bodyTimers.current.get(id));
+    transPending.current.delete(id);
+    clearTimeout(transTimers.current.get(id));
     setError(null);
     const res = await removeSetlistItem(setlist.id, id);
     structuralRev.current++;
@@ -353,7 +384,12 @@ export function SetlistPlayer({
     addMessages(state.messages);
 
     const local = itemsRef.current;
-    const pendingIds = new Set([...pending.current.keys(), ...bodyPending.current.keys(), ...savingIds.current.keys()]);
+    const pendingIds = new Set([
+      ...pending.current.keys(),
+      ...bodyPending.current.keys(),
+      ...transPending.current.keys(),
+      ...savingIds.current.keys(),
+    ]);
     const merged = mergeRemote(local, state.items, { pendingIds, editingId: editingRef.current });
 
     const unchanged = merged.items.length === local.length && merged.items.every((it, i) => it === local[i]);
@@ -553,6 +589,9 @@ export function SetlistPlayer({
               settings={current.settings}
               onChange={(s) => changeSettings(current.id, s)}
             />
+            {nextItem && (
+              <TransitionPanel from={current} to={nextItem} onChange={(t) => changeTransition(current.id, t)} />
+            )}
           </>
         )}
 
@@ -637,7 +676,7 @@ export function SetlistPlayer({
               currentId={viewId}
               activeId={stageId}
               onSendToStage={(id) => void sendToStage(id)}
-              library={library}
+              onSearch={findSongs}
               busy={busy}
               error={error}
               onSelect={setCurrentId}
@@ -652,10 +691,11 @@ export function SetlistPlayer({
               status={sync.status}
               roles={sync.roles}
               highlightIds={highlight}
+              reference={current ? <KeyChords item={current} /> : null}
               chat={<SetlistChat messages={messages} role={role} screenId={screenId} onSend={say} />}
               keyControl={
                 liveView && current && role !== "viewer" ? (
-                  <LiveControls item={current} onChange={(settings) => changeSettings(current.id, settings)} />
+                  <LiveControls item={current} showCapo={role !== "stage"} onChange={(settings) => changeSettings(current.id, settings)} />
                 ) : null
               }
             />

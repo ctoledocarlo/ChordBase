@@ -8,6 +8,7 @@ const item = (id: string, over: Partial<SetlistItem> = {}): SetlistItem => ({
   song_id: `song-${id}`,
   settings: defaultSettings(0),
   body_override: null,
+  transition: { mode: "auto", chords: "" },
   song: { title: `Song ${id}`, artist: "", original_key: "G", default_capo: 0, tempo: null, body: "[G]hello" },
   ...over,
 });
@@ -35,6 +36,12 @@ describe("catching up with a setlist changed elsewhere", () => {
     expect(r.updated.map((i) => i.id)).toEqual(["a"]);
     expect(r.items[0].settings.semitones).toBe(2);
     expect(r.items[0].body_override).toBe("[A]hi");
+  });
+
+  it("takes a changed transition", () => {
+    const r = mergeRemote([item("a")], [item("a", { transition: { mode: "manual", chords: "D7 G" } })], none);
+    expect(r.updated.map((i) => i.id)).toEqual(["a"]);
+    expect(r.items[0].transition.chords).toBe("D7 G");
   });
 
   it("keeps a song that has local changes waiting to be saved", () => {

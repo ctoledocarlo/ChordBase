@@ -6,11 +6,11 @@ import {
   parseChord,
   parseSections,
   pitchClass,
-  spellingForKey,
+  restyleSections,
   transposeChordPro,
-  transposeChordText,
-  type Spelling,
+  CHORD_STYLES,
 } from "@/lib/chords";
+import { deriveSong } from "@/lib/setlist-derive";
 import { FIT, defaultSettings } from "@/lib/setlist-settings";
 import type { PresetSettings } from "@/lib/songs";
 import { MinusIcon, PlusIcon } from "./icons";
@@ -26,29 +26,17 @@ function keyOptions(originalKey: string): string[] {
   });
 }
 
-/** What the settings do to a song: the key it sounds in, the shapes to play, and how to spell chords. */
-export function deriveSong(originalKey: string, settings: PresetSettings) {
-  const hasKey = parseChord(originalKey) !== null;
-  const { semitones, capo, spelling: spellingChoice } = settings;
-  // The key the band sounds in, and the shapes the guitarist plays with the capo on.
-  const shapeShift = (((semitones - capo) % 12) + 12) % 12;
-  const shapeKey = hasKey ? transposeChordText(originalKey, shapeShift, "sharp") : "";
-  const spelling: Spelling =
-    spellingChoice === "auto" ? (hasKey ? spellingForKey(shapeKey) : "sharp") : spellingChoice;
-  const soundingKey = hasKey ? transposeChordText(originalKey, semitones, spelling) : "";
-  const shownShapeKey = hasKey ? transposeChordText(originalKey, shapeShift, spelling) : "";
-  const keyLabel = hasKey ? soundingKey + (capo > 0 ? `, capo ${capo}` : "") : originalKey;
-  return { hasKey, shapeShift, spelling, soundingKey, shownShapeKey, keyLabel };
-}
-
 /** The song's sections, transposed to match the settings. */
 export function useSongSections(body: string, originalKey: string, settings: PresetSettings) {
-  const { shapeShift, spelling } = deriveSong(originalKey, settings);
+  const { shapeShift, spelling, shownShapeKey } = deriveSong(originalKey, settings);
+  const style = settings.style ?? "original";
   return useMemo(
-    () => parseSections(transposeChordPro(body, shapeShift, spelling)),
-    [body, shapeShift, spelling],
+    () => restyleSections(parseSections(transposeChordPro(body, shapeShift, spelling)), style, shownShapeKey),
+    [body, shapeShift, spelling, style, shownShapeKey],
   );
 }
+
+export { deriveSong };
 
 export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -68,11 +56,14 @@ export function KeyPicker({
   settings,
   onChange,
   steppers = false,
+  compact = false,
 }: {
   originalKey: string;
   settings: PresetSettings;
   onChange: (settings: PresetSettings) => void;
   steppers?: boolean;
+  /** Leave out the "Now in ..." line. */
+  compact?: boolean;
 }) {
   const set = (patch: Partial<PresetSettings>) => onChange({ ...settings, ...patch });
   const { semitones } = settings;
@@ -124,14 +115,50 @@ export function KeyPicker({
       ) : (
         select
       )}
-      {semitones !== 0 && <p className="mt-1.5 text-sm text-muted">Now in {soundingKey}</p>}
+      {!compact && semitones !== 0 && <p className="mt-1.5 text-sm text-muted">Now in {soundingKey}</p>}
+    </>
+  );
+}
+
+/** Original, Classic, Jazzy or Gospel: how the chords are dressed (see lib/chords/styles). */
+export function ChordStylePicker({
+  settings,
+  onChange,
+  compact = false,
+}: {
+  settings: PresetSettings;
+  onChange: (settings: PresetSettings) => void;
+  /** Just the choice, without the line explaining it. */
+  compact?: boolean;
+}) {
+  const style = settings.style ?? "original";
+  return (
+    <>
+      <select
+        className="field field-sm"
+        aria-label="Chord style"
+        value={style}
+        onChange={(e) => onChange({ ...settings, style: e.target.value as NonNullable<PresetSettings["style"]> })}
+      >
+        {CHORD_STYLES.map((s) => (
+          <option key={s.value} value={s.value}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+      {!compact && (
+      <p className="mt-1.5 text-sm text-muted">
+        {CHORD_STYLES.find((s) => s.value === style)?.hint}
+        {style !== "original" && ". Simple rules, so check them before you play."}
+      </p>
+      )}
     </>
   );
 }
 
 const same = (a: PresetSettings, b: PresetSettings) =>
   a.semitones === b.semitones && a.capo === b.capo && a.spelling === b.spelling &&
-  a.showChords === b.showChords && a.fontSize === b.fontSize;
+  a.showChords === b.showChords && a.fontSize === b.fontSize && (a.style ?? "original") === (b.style ?? "original");
 
 /** Key, capo, sharps and flats, and display options for one song. */
 export function SongSettingsPanel({
@@ -188,6 +215,10 @@ export function SongSettingsPanel({
           <option value="sharp">Sharps (#)</option>
           <option value="flat">Flats (b)</option>
         </select>
+      </Group>
+
+      <Group title="Chord style">
+        <ChordStylePicker settings={settings} onChange={onChange} />
       </Group>
 
       <Group title="Display">
