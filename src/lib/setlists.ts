@@ -81,13 +81,15 @@ export async function listSetlists(
   await supabase.from("setlists").delete().lt("expires_at", new Date().toISOString());
   let req = supabase
     .from("setlists")
-    .select("id, name, service_date, expires_at, setlist_items(count)")
+    // setlists.active_item_id also points at setlist_items, so say which link to count along.
+    .select("id, name, service_date, expires_at, setlist_items!setlist_id(count)")
     .order("service_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(1000);
   if (range?.from) req = req.gte("service_date", range.from);
   if (range?.to) req = req.lte("service_date", range.to);
-  const { data } = await req;
+  const { data, error } = await req;
+  if (error) console.error("listSetlists failed:", error.message);
 
   const rows = ((data as unknown as (Setlist & { setlist_items: { count: number }[] })[] | null) ?? []).map((r) => ({
     id: r.id,
