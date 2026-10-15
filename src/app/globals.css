@@ -203,6 +203,16 @@ body {
   }
 }
 
+/* A row that just changed on another screen glows once and settles. */
+@keyframes flash {
+  from {
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+}
+.anim-flash {
+  animation: flash 2.5s ease-out;
+}
+
 /* A page fades in when you move to it. Opacity only, so fixed-position screens (live mode) aren't affected. */
 .page-enter {
   animation: fade 0.25s ease-out;

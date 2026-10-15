@@ -3,9 +3,16 @@ import { setlistMatches } from "./setlist-search";
 import { normalizeSettings } from "./setlist-settings";
 import type { PresetSettings } from "./songs";
 
-export type Setlist = { id: string; name: string; service_date: string | null; expires_at: string };
+export type Setlist = {
+  id: string;
+  name: string;
+  service_date: string | null;
+  expires_at: string;
+  /** The song on stage right now (Media screens choose it; Stage and Viewer follow). Null = nothing chosen yet. */
+  active_item_id: string | null;
+};
 
-export type SetlistSummary = Setlist & { songCount: number };
+export type SetlistSummary = Omit<Setlist, "active_item_id"> & { songCount: number };
 
 /** The song as it needs to be shown during the service. */
 export type SetlistSong = {
@@ -22,17 +29,20 @@ export type SetlistItem = {
   id: string;
   song_id: string;
   settings: PresetSettings;
+  /** This setlist's own version of the song's chords and layout, in the song's original key. Null = the song as it is. */
+  body_override: string | null;
   song: SetlistSong;
 };
 
 /** Columns to select for an item together with its song. */
 export const ITEM_COLUMNS =
-  "id, song_id, position, settings, songs(title, artist, original_key, default_capo, tempo, body)";
+  "id, song_id, position, settings, body_override, songs(title, artist, original_key, default_capo, tempo, body)";
 
 type ItemRow = {
   id: string;
   song_id: string;
   settings: unknown;
+  body_override: string | null;
   songs: SetlistSong | null;
 };
 
@@ -42,6 +52,7 @@ export function toItem(row: ItemRow): SetlistItem | null {
     id: row.id,
     song_id: row.song_id,
     settings: normalizeSettings(row.settings, row.songs.default_capo),
+    body_override: row.body_override,
     song: row.songs,
   };
 }
@@ -90,7 +101,7 @@ export async function getSetlist(id: string): Promise<{ setlist: Setlist; items:
   const supabase = await createClient();
   const { data: setlist } = await supabase
     .from("setlists")
-    .select("id, name, service_date, expires_at")
+    .select("id, name, service_date, expires_at, active_item_id")
     .eq("id", id)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle<Setlist>();
@@ -104,4 +115,30 @@ export async function getSetlist(id: string): Promise<{ setlist: Setlist; items:
     .order("created_at", { ascending: true });
   const items = ((data as unknown as ItemRow[] | null) ?? []).map(toItem).filter((i): i is SetlistItem => i !== null);
   return { setlist, items };
+}
+
+/** One line of the session chat. */
+export type ChatMessage = {
+  id: string;
+  /** "stage", "media" or "viewer": what kind of screen sent it. */
+  sender_role: string;
+  /** The sending tab's id, to tell "mine" from the others'. */
+  sender: string;
+  body: string;
+  created_at: string;
+};
+
+export const MESSAGE_COLUMNS = "id, sender_role, sender, body, created_at";
+export const CHAT_HISTORY = 100;
+
+/** The latest messages for a setlist, oldest first. */
+export async function listMessages(setlistId: string): Promise<ChatMessage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("setlist_messages")
+    .select(MESSAGE_COLUMNS)
+    .eq("setlist_id", setlistId)
+    .order("created_at", { ascending: false })
+    .limit(CHAT_HISTORY);
+  return ((data as ChatMessage[] | null) ?? []).reverse();
 }

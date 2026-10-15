@@ -97,6 +97,11 @@ export const GripIcon = () => (
     <circle cx="10" cy="12" r="0.9" fill="currentColor" stroke="none" />
   </Icon>
 );
+export const PlayIcon = () => (
+  <Icon>
+    <path d="M5.5 3.5v9l7-4.5Z" />
+  </Icon>
+);
 export const ChevronIcon = () => (
   <Icon>
     <path d="m4 6 4 4 4-4" />

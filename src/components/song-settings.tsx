@@ -59,6 +59,76 @@ export function Group({ title, children }: { title: string; children: ReactNode 
   );
 }
 
+/**
+ * Choose the key a song is played in. With `steppers`, a button on each side moves it a half step
+ * down or up, which is quicker when the band just needs it a touch higher.
+ */
+export function KeyPicker({
+  originalKey,
+  settings,
+  onChange,
+  steppers = false,
+}: {
+  originalKey: string;
+  settings: PresetSettings;
+  onChange: (settings: PresetSettings) => void;
+  steppers?: boolean;
+}) {
+  const set = (patch: Partial<PresetSettings>) => onChange({ ...settings, ...patch });
+  const { semitones } = settings;
+  const { hasKey, soundingKey } = deriveSong(originalKey, settings);
+  const options = useMemo(() => keyOptions(originalKey), [originalKey]);
+  const originalPc = hasKey ? pitchClass(parseChord(originalKey)!.root) : 0;
+  const selectedPc = (originalPc + semitones) % 12;
+  const step = (delta: number) => set({ semitones: (semitones + delta + 12) % 12 });
+
+  if (!hasKey) {
+    return (
+      <Stepper
+        value={semitones > 6 ? semitones - 12 : semitones}
+        onMinus={() => step(-1)}
+        onPlus={() => step(1)}
+        label="Transpose"
+      />
+    );
+  }
+
+  const select = (
+    <select
+      className="field field-sm"
+      aria-label="Key"
+      value={selectedPc}
+      onChange={(e) => set({ semitones: (Number(e.target.value) - originalPc + 12) % 12 })}
+    >
+      {options.map((label, pc) => (
+        <option key={label} value={pc}>
+          {label}
+          {pc === originalPc ? " (original)" : ""}
+        </option>
+      ))}
+    </select>
+  );
+
+  return (
+    <>
+      {steppers ? (
+        <div className="flex items-center gap-1.5">
+          <button type="button" className="btn btn-icon" onClick={() => step(-1)} aria-label="Down a half step" title="Down a half step">
+            <MinusIcon />
+          </button>
+          <div className="min-w-0 flex-1">{select}</div>
+          <button type="button" className="btn btn-icon" onClick={() => step(1)} aria-label="Up a half step" title="Up a half step">
+            <PlusIcon />
+          </button>
+        </div>
+      ) : (
+        select
+      )}
+      {semitones !== 0 && <p className="mt-1.5 text-sm text-muted">Now in {soundingKey}</p>}
+    </>
+  );
+}
+
 const same = (a: PresetSettings, b: PresetSettings) =>
   a.semitones === b.semitones && a.capo === b.capo && a.spelling === b.spelling &&
   a.showChords === b.showChords && a.fontSize === b.fontSize;
@@ -77,12 +147,8 @@ export function SongSettingsPanel({
 }) {
   const defaults = defaultSettings(defaultCapo);
   const set = (patch: Partial<PresetSettings>) => onChange({ ...settings, ...patch });
-  const { semitones, capo, spelling: spellingChoice, showChords, fontSize } = settings;
+  const { capo, spelling: spellingChoice, showChords, fontSize } = settings;
   const { hasKey, soundingKey, shownShapeKey } = deriveSong(originalKey, settings);
-
-  const options = useMemo(() => keyOptions(originalKey), [originalKey]);
-  const originalPc = hasKey ? pitchClass(parseChord(originalKey)!.root) : 0;
-  const selectedPc = (originalPc + semitones) % 12;
 
   function stepSize(delta: number) {
     const el = document.querySelector<HTMLElement>("[data-fit-area]");
@@ -93,30 +159,7 @@ export function SongSettingsPanel({
   return (
     <>
       <Group title="Key">
-        {hasKey ? (
-          <>
-            <select
-              className="field field-sm"
-              value={selectedPc}
-              onChange={(e) => set({ semitones: (Number(e.target.value) - originalPc + 12) % 12 })}
-            >
-              {options.map((label, pc) => (
-                <option key={label} value={pc}>
-                  {label}
-                  {pc === originalPc ? " (original)" : ""}
-                </option>
-              ))}
-            </select>
-            {semitones !== 0 && <p className="mt-1.5 text-sm text-muted">Now in {soundingKey}</p>}
-          </>
-        ) : (
-          <Stepper
-            value={semitones > 6 ? semitones - 12 : semitones}
-            onMinus={() => set({ semitones: (semitones + 11) % 12 })}
-            onPlus={() => set({ semitones: (semitones + 1) % 12 })}
-            label="Transpose"
-          />
-        )}
+        <KeyPicker originalKey={originalKey} settings={settings} onChange={onChange} />
       </Group>
 
       <Group title="Capo">

@@ -46,17 +46,20 @@ export function LiveFrame({
   live,
   onExit,
   liveClassName = "",
+  hideExit = false,
   children,
 }: {
   live: boolean;
   onExit: () => void;
   /** Extra classes while live (for instance, room for the Exit button). */
   liveClassName?: string;
+  /** For screens that are always live (Stage and Viewer), so there is nothing to exit to. */
+  hideExit?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className={live ? `fixed inset-0 z-50 bg-background p-6 ${liveClassName}` : undefined}>
-      {live && (
+      {live && !hideExit && (
         <button type="button" onClick={onExit} className="btn fixed right-4 top-4 z-10" aria-label="Exit live mode">
           <CloseIcon /> Exit
         </button>

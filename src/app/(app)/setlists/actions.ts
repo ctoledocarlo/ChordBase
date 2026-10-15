@@ -5,13 +5,25 @@ import { redirect } from "next/navigation";
 import { getCurrentChurch } from "@/lib/church";
 import { DEFAULT_KEEP_MONTHS, expiryFrom, isKeepMonths } from "@/lib/setlist-expiry";
 import { defaultSettings, validSettings } from "@/lib/setlist-settings";
-import { ITEM_COLUMNS, toItem, type SetlistItem } from "@/lib/setlists";
+import {
+  ITEM_COLUMNS,
+  MESSAGE_COLUMNS,
+  getSetlist,
+  listMessages,
+  toItem,
+  type ChatMessage,
+  type Setlist,
+  type SetlistItem,
+} from "@/lib/setlists";
 import type { PresetSettings } from "@/lib/songs";
 import { createClient } from "@/lib/supabase/server";
 
 export type SetlistResult = { error?: string };
 
 const NOT_SIGNED_IN = "You're not signed in to a church.";
+
+/** The id a browser tab makes up for itself, saved with a change so that tab can ignore its own echo. */
+const screenId = (id: string | undefined) => (typeof id === "string" && id.length > 0 ? id.slice(0, 64) : null);
 
 const text = (formData: FormData, key: string) => {
   const value = formData.get(key);
@@ -101,6 +113,7 @@ export async function updateSetlist(
   name: string,
   serviceDate: string,
   keepMonths: number | null = null,
+  clientId?: string,
 ): Promise<SetlistResult & { expires_at?: string }> {
   const church = await getCurrentChurch();
   if (!church) return { error: NOT_SIGNED_IN };
@@ -111,7 +124,11 @@ export async function updateSetlist(
 
   const supabase = await createClient();
   if (keepMonths !== null && !isKeepMonths(keepMonths)) return { error: "A setlist can be kept for up to a year." };
-  const fields: { name: string; service_date: string | null; expires_at?: string } = { name: trimmed, service_date: date };
+  const fields: { name: string; service_date: string | null; expires_at?: string; edited_by: string | null } = {
+    name: trimmed,
+    service_date: date,
+    edited_by: screenId(clientId),
+  };
   if (keepMonths !== null) fields.expires_at = expiryFrom(keepMonths).toISOString();
   const { error } = await supabase.from("setlists").update(fields).eq("id", id);
   if (error) return { error: "Couldn't save. Please try again." };
@@ -132,11 +149,15 @@ export async function deleteSetlist(formData: FormData) {
 }
 
 /** Writes the order: each id gets its place in the list as its position. */
-async function renumber(setlistId: string, ids: string[]): Promise<boolean> {
+async function renumber(setlistId: string, ids: string[], clientId?: string): Promise<boolean> {
   const supabase = await createClient();
   const results = await Promise.all(
     ids.map((id, position) =>
-      supabase.from("setlist_items").update({ position }).eq("id", id).eq("setlist_id", setlistId),
+      supabase
+        .from("setlist_items")
+        .update({ position, edited_by: screenId(clientId) })
+        .eq("id", id)
+        .eq("setlist_id", setlistId),
     ),
   );
   return results.every((r) => !r.error);
@@ -150,6 +171,7 @@ export async function addSetlistItem(
   setlistId: string,
   songId: string,
   index: number | null,
+  clientId?: string,
 ): Promise<{ item?: SetlistItem; error?: string }> {
   const church = await getCurrentChurch();
   if (!church) return { error: NOT_SIGNED_IN };
@@ -179,6 +201,7 @@ export async function addSetlistItem(
       song_id: songId,
       position: at,
       settings: defaultSettings(song.default_capo),
+      edited_by: screenId(clientId),
     })
     .select(ITEM_COLUMNS)
     .single();
@@ -189,7 +212,7 @@ export async function addSetlistItem(
 
   if (at < ids.length) {
     ids.splice(at, 0, item.id);
-    if (!(await renumber(setlistId, ids))) return { item, error: "Added, but the order may be off. Reload to check." };
+    if (!(await renumber(setlistId, ids, clientId))) return { item, error: "Added, but the order may be off. Reload to check." };
   }
   return { item };
 }
@@ -202,19 +225,89 @@ export async function removeSetlistItem(setlistId: string, itemId: string): Prom
   return error ? { error: "Couldn't remove that song." } : {};
 }
 
-export async function reorderSetlistItems(setlistId: string, ids: string[]): Promise<SetlistResult> {
+export async function reorderSetlistItems(setlistId: string, ids: string[], clientId?: string): Promise<SetlistResult> {
   const church = await getCurrentChurch();
   if (!church) return { error: NOT_SIGNED_IN };
   if (ids.length > 500) return { error: "That setlist is too long." };
-  return (await renumber(setlistId, ids)) ? {} : { error: "Couldn't save the new order." };
+  return (await renumber(setlistId, ids, clientId)) ? {} : { error: "Couldn't save the new order." };
 }
 
 /** Saves how one song is set up in this setlist (key, capo, text size, chords on or off). */
-export async function saveItemSettings(itemId: string, settings: PresetSettings): Promise<SetlistResult> {
+export async function saveItemSettings(itemId: string, settings: PresetSettings, clientId?: string): Promise<SetlistResult> {
   const church = await getCurrentChurch();
   if (!church) return { error: NOT_SIGNED_IN };
   if (!validSettings(settings)) return { error: "Those settings aren't valid." };
   const supabase = await createClient();
-  const { error } = await supabase.from("setlist_items").update({ settings }).eq("id", itemId);
+  const { error } = await supabase
+    .from("setlist_items")
+    .update({ settings, edited_by: screenId(clientId) })
+    .eq("id", itemId);
   return error ? { error: "Couldn't save these settings." } : {};
+}
+
+const MAX_BODY = 200_000;
+
+/** Saves this setlist's own version of a song's chords (null goes back to the song as it is). */
+export async function saveItemBody(itemId: string, body: string | null, clientId?: string): Promise<SetlistResult> {
+  const church = await getCurrentChurch();
+  if (!church) return { error: NOT_SIGNED_IN };
+  if (body !== null && (typeof body !== "string" || body.length > MAX_BODY)) return { error: "That song is too long." };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("setlist_items")
+    .update({
+      edited_by: screenId(clientId),
+      body_override: body === null ? null : body.replace(/\r\n?/g, "\n") })
+    .eq("id", itemId);
+  return error ? { error: "Couldn't save the chords." } : {};
+}
+
+/** The setlist as it is now, for a screen catching up with changes made elsewhere. Null if it is gone. */
+export async function getSetlistState(
+  setlistId: string,
+): Promise<{ setlist: Setlist; items: SetlistItem[]; messages: ChatMessage[] } | null> {
+  const church = await getCurrentChurch();
+  if (!church) return null;
+  const [found, messages] = await Promise.all([getSetlist(setlistId), listMessages(setlistId)]);
+  return found ? { ...found, messages } : null;
+}
+
+const MAX_MESSAGE = 500;
+
+/** Sends a line to the session chat. */
+export async function sendMessage(
+  setlistId: string,
+  body: string,
+  role: string,
+  clientId: string,
+): Promise<{ message?: ChatMessage; error?: string }> {
+  const church = await getCurrentChurch();
+  if (!church) return { error: NOT_SIGNED_IN };
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!text) return { error: "Type a message first." };
+  if (text.length > MAX_MESSAGE) return { error: `Keep it under ${MAX_MESSAGE} characters.` };
+  if (role !== "stage" && role !== "media" && role !== "viewer") return { error: "Unknown screen type." };
+  const sender = screenId(clientId);
+  if (!sender) return { error: "Couldn't send that." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("setlist_messages")
+    .insert({ church_id: church.id, setlist_id: setlistId, sender_role: role, sender, body: text })
+    .select(MESSAGE_COLUMNS)
+    .single<ChatMessage>();
+  if (error || !data) return { error: "Couldn't send that. Please try again." };
+  return { message: data };
+}
+
+/** Puts a song on stage: Stage and Viewer screens switch to it. Null clears the choice. */
+export async function setActiveItem(setlistId: string, itemId: string | null, clientId?: string): Promise<SetlistResult> {
+  const church = await getCurrentChurch();
+  if (!church) return { error: NOT_SIGNED_IN };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("setlists")
+    .update({ active_item_id: itemId, edited_by: screenId(clientId) })
+    .eq("id", setlistId);
+  return error ? { error: "Couldn't change the song on stage." } : {};
 }
