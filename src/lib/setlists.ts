@@ -77,18 +77,21 @@ export async function listSetlists(
   range?: { from?: string; to?: string },
 ): Promise<{ upcoming: SetlistSummary[]; past: SetlistSummary[] }> {
   const supabase = await createClient();
-  // Setlists past their expiry are removed here, the next time anyone looks at the list.
-  await supabase.from("setlists").delete().lt("expires_at", new Date().toISOString());
+  const now = new Date().toISOString();
   let req = supabase
     .from("setlists")
     // setlists.active_item_id also points at setlist_items, so say which link to count along.
     .select("id, name, service_date, expires_at, setlist_items!setlist_id(count)")
+    // Expired setlists are hidden whether or not they have been removed yet.
+    .gt("expires_at", now)
     .order("service_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(1000);
   if (range?.from) req = req.gte("service_date", range.from);
   if (range?.to) req = req.lte("service_date", range.to);
-  const { data, error } = await req;
+  // Removing the expired ones (the database also does this every hour, where it can) happens alongside
+  // the read, not before it, since nothing in the list depends on it.
+  const [{ data, error }] = await Promise.all([req, supabase.from("setlists").delete().lt("expires_at", now)]);
   if (error) console.error("listSetlists failed:", error.message);
 
   const rows = ((data as unknown as (Setlist & { setlist_items: { count: number }[] })[] | null) ?? []).map((r) => ({
@@ -108,22 +111,57 @@ export async function listSetlists(
   return { upcoming, past };
 }
 
+/** The setlist coming up next (soonest date, or one with no date yet), with its song count. */
+export async function getNextSetlist(): Promise<SetlistSummary | null> {
+  const supabase = await createClient();
+  const now = new Date();
+  const { data, error } = await supabase
+    .from("setlists")
+    .select("id, name, service_date, expires_at, setlist_items!setlist_id(count)")
+    .gt("expires_at", now.toISOString())
+    .or(`service_date.is.null,service_date.gte.${now.toISOString().slice(0, 10)}`)
+    .order("service_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true })
+    .limit(1);
+  if (error) console.error("getNextSetlist failed:", error.message);
+  const r = (data as unknown as (Setlist & { setlist_items: { count: number }[] })[] | null)?.[0];
+  return r
+    ? { id: r.id, name: r.name, service_date: r.service_date, expires_at: r.expires_at, songCount: r.setlist_items?.[0]?.count ?? 0 }
+    : null;
+}
+
+/** Names and dates of the setlists a song can be added to (no counts, nothing removed). */
+export async function listSetlistChoices(): Promise<Pick<Setlist, "id" | "name" | "service_date">[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("setlists")
+    .select("id, name, service_date")
+    .gt("expires_at", new Date().toISOString())
+    .order("service_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
+  return (data as Pick<Setlist, "id" | "name" | "service_date">[] | null) ?? [];
+}
+
 export async function getSetlist(id: string): Promise<{ setlist: Setlist; items: SetlistItem[] } | null> {
   const supabase = await createClient();
-  const { data: setlist } = await supabase
-    .from("setlists")
-    .select("id, name, service_date, expires_at, active_item_id")
-    .eq("id", id)
-    .gt("expires_at", new Date().toISOString())
-    .maybeSingle<Setlist>();
+  // The setlist and its songs are read together; the songs of a setlist that turns out not to exist are simply dropped.
+  const [{ data: setlist }, { data }] = await Promise.all([
+    supabase
+      .from("setlists")
+      .select("id, name, service_date, expires_at, active_item_id")
+      .eq("id", id)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle<Setlist>(),
+    supabase
+      .from("setlist_items")
+      .select(ITEM_COLUMNS)
+      .eq("setlist_id", id)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true }),
+  ]);
   if (!setlist) return null;
 
-  const { data } = await supabase
-    .from("setlist_items")
-    .select(ITEM_COLUMNS)
-    .eq("setlist_id", id)
-    .order("position", { ascending: true })
-    .order("created_at", { ascending: true });
   const items = ((data as unknown as ItemRow[] | null) ?? []).map(toItem).filter((i): i is SetlistItem => i !== null);
   return { setlist, items };
 }

@@ -2,13 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/lib/setlists";
-import { createClient } from "@/lib/supabase/client";
+import type { createClient } from "@/lib/supabase/client";
 import type { ScreenRole } from "./use-screen-role";
 
 export type SyncStatus = "connecting" | "live" | "offline";
 
-/** How often to check in even if no live message arrives, in case one was missed. */
+/** How often to check in while the live connection is down, in case something was missed. */
 const CATCH_UP_EVERY_MS = 45_000;
+/** While the connection is up, messages arrive on their own, so checking in is only a safety net. */
+const SAFETY_NET_EVERY_MS = 4 * CATCH_UP_EVERY_MS;
 /** Wait a moment after a change so a burst of them (like a reorder) is one catch-up. */
 const SETTLE_MS = 200;
 
@@ -48,81 +50,100 @@ export function useSetlistSync(setlistId: string, screenId: string, role: Screen
   });
 
   useEffect(() => {
-    const supabase = createClient();
     let settle: ReturnType<typeof setTimeout> | undefined;
     let wasLive = false;
+    let up = false;
+    let ticks = 0;
+    let cancelled = false;
+    let disconnect: (() => void) | undefined;
+
     const catchUpSoon = () => {
       clearTimeout(settle);
       settle = setTimeout(() => latest.current.catchUp(), SETTLE_MS);
     };
 
     type Row = Record<string, unknown> | undefined;
-    const channel = supabase.channel(`setlist:${setlistId}`, { config: { presence: { key: screenId } } });
 
-    // Listens church-wide and picks out this setlist's rows here, since Realtime can't filter deletes.
-    channel
-      .on("postgres_changes", { event: "*", schema: "public", table: "setlist_items" }, (p) => {
-        if (p.eventType === "DELETE") {
-          const id = (p.old as Row)?.id;
-          if (typeof id === "string") latest.current.itemDeleted(id);
-          return;
-        }
-        const row = p.new as Row;
-        if (row?.setlist_id !== setlistId || row?.edited_by === screenId) return;
-        catchUpSoon();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "setlists" }, (p) => {
-        if (p.eventType === "DELETE") {
-          if ((p.old as Row)?.id === setlistId) latest.current.setlistDeleted();
-          return;
-        }
-        const row = p.new as Row;
-        if (row?.id === setlistId && row?.edited_by !== screenId) catchUpSoon();
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "songs" }, (p) => {
-        const id = (p.new as Row)?.id;
-        if (typeof id === "string" && latest.current.hasSong(id)) catchUpSoon();
-      })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "setlist_messages" }, (p) => {
-        const row = p.new as (Row & ChatMessage) | undefined;
-        if (row && row.setlist_id === setlistId) {
-          latest.current.message({
-            id: row.id,
-            sender_role: row.sender_role,
-            sender: row.sender,
-            body: row.body,
-            created_at: row.created_at,
-          });
-        }
-      })
-      .on("presence", { event: "sync" }, () => {
-        const counts: Partial<Record<ScreenRole, number>> = {};
-        for (const metas of Object.values(channel.presenceState<{ role?: ScreenRole }>())) {
-          const r = metas[0]?.role;
-          if (r) counts[r] = (counts[r] ?? 0) + 1;
-        }
-        setRoles(counts);
+    function connect(supabase: ReturnType<typeof createClient>) {
+      const channel = supabase.channel(`setlist:${setlistId}`, { config: { presence: { key: screenId } } });
+
+      // Listens church-wide and picks out this setlist's rows here, since Realtime can't filter deletes.
+      channel
+        .on("postgres_changes", { event: "*", schema: "public", table: "setlist_items" }, (p) => {
+          if (p.eventType === "DELETE") {
+            const id = (p.old as Row)?.id;
+            if (typeof id === "string") latest.current.itemDeleted(id);
+            return;
+          }
+          const row = p.new as Row;
+          if (row?.setlist_id !== setlistId || row?.edited_by === screenId) return;
+          catchUpSoon();
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "setlists" }, (p) => {
+          if (p.eventType === "DELETE") {
+            if ((p.old as Row)?.id === setlistId) latest.current.setlistDeleted();
+            return;
+          }
+          const row = p.new as Row;
+          if (row?.id === setlistId && row?.edited_by !== screenId) catchUpSoon();
+        })
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "songs" }, (p) => {
+          const id = (p.new as Row)?.id;
+          if (typeof id === "string" && latest.current.hasSong(id)) catchUpSoon();
+        })
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "setlist_messages" }, (p) => {
+          const row = p.new as (Row & ChatMessage) | undefined;
+          if (row && row.setlist_id === setlistId) {
+            latest.current.message({
+              id: row.id,
+              sender_role: row.sender_role,
+              sender: row.sender,
+              body: row.body,
+              created_at: row.created_at,
+            });
+          }
+        })
+        .on("presence", { event: "sync" }, () => {
+          const counts: Partial<Record<ScreenRole, number>> = {};
+          for (const metas of Object.values(channel.presenceState<{ role?: ScreenRole }>())) {
+            const r = metas[0]?.role;
+            if (r) counts[r] = (counts[r] ?? 0) + 1;
+          }
+          setRoles(counts);
+        });
+
+      void supabase.auth.getSession().then(({ data }) => {
+        if (cancelled) return;
+        if (data.session) supabase.realtime.setAuth(data.session.access_token);
+        channel.subscribe((s) => {
+          if (s === "SUBSCRIBED") {
+            up = true;
+            setStatus("live");
+            void channel.track({ role });
+            // Anything that changed while we were disconnected.
+            if (wasLive) catchUpSoon();
+            wasLive = true;
+          } else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
+            up = false;
+            setStatus("offline");
+          }
+        });
       });
 
-    let cancelled = false;
-    void supabase.auth.getSession().then(({ data }) => {
-      if (cancelled) return;
-      if (data.session) supabase.realtime.setAuth(data.session.access_token);
-      channel.subscribe((s) => {
-        if (s === "SUBSCRIBED") {
-          setStatus("live");
-          void channel.track({ role });
-          // Anything that changed while we were disconnected.
-          if (wasLive) catchUpSoon();
-          wasLive = true;
-        } else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT" || s === "CLOSED") {
-          setStatus("offline");
-        }
-      });
+      return () => void supabase.removeChannel(channel);
+    }
+
+    // The live connection's code is loaded after the page has appeared, not as part of it.
+    void import("@/lib/supabase/client").then(({ createClient: make }) => {
+      if (!cancelled) disconnect = connect(make());
     });
 
     const interval = setInterval(() => {
-      if (document.visibilityState === "visible") latest.current.catchUp();
+      ticks++;
+      if (document.visibilityState !== "visible") return;
+      // With the connection up, check in a quarter as often.
+      const every = up ? SAFETY_NET_EVERY_MS / CATCH_UP_EVERY_MS : 1;
+      if (ticks % every === 0) latest.current.catchUp();
     }, CATCH_UP_EVERY_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") catchUpSoon();
@@ -136,7 +157,7 @@ export function useSetlistSync(setlistId: string, screenId: string, role: Screen
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", catchUpSoon);
-      void supabase.removeChannel(channel);
+      disconnect?.();
     };
   }, [setlistId, screenId, role]);
 

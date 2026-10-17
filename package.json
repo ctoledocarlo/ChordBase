@@ -7,7 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "vitest bench --run",
+    "bench:db": "node bench/db/run.mjs",
+    "bench:bundle": "node scripts/bundle-report.mjs",
+    "bench:e2e": "node bench/e2e/run.mjs",
+    "bench:verify": "node bench/db/verify.mjs",
+    "bench:report": "node bench/report.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -19,6 +25,7 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

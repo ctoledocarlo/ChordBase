@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { transitionDisplay } from "@/lib/setlist-transition";
 import type { SetlistItem } from "@/lib/setlists";
 import type { SongSummary } from "@/lib/songs";
@@ -101,7 +101,13 @@ export function SetlistRail({
   const anchor = media || viewIndex < 0 ? stageIndex : viewIndex;
   const next = anchor >= 0 ? items[anchor + 1] : undefined;
   // How the song being looked at leads into the next one.
-  const bridge = anchor >= 0 && next ? transitionDisplay(items[anchor], next) : null;
+  const anchorItem = anchor >= 0 ? items[anchor] : undefined;
+  const bridge = useMemo(() => (anchorItem && next ? transitionDisplay(anchorItem, next) : null), [anchorItem, next]);
+  // The key each song is set to, worked out once per change to the setlist rather than on every redraw.
+  const keys = useMemo(
+    () => new Map(items.map((i) => [i.id, deriveSong(i.song.original_key, i.settings).soundingKey || i.song.original_key])),
+    [items],
+  );
   const awayFromStage = role === "stage" && currentId !== null && currentId !== activeId;
 
   // Songs found for what was typed. Asks the server a moment after typing stops.
@@ -210,7 +216,7 @@ export function SetlistRail({
           {next ? (
             <>
               <span className="min-w-0 flex-1 truncate">{next.song.title}</span>
-              <span className="flex-none font-mono text-xs text-muted">{deriveSong(next.song.original_key, next.settings).soundingKey || next.song.original_key}</span>
+              <span className="flex-none font-mono text-xs text-muted">{keys.get(next.id)}</span>
             </>
           ) : (
             <span className="text-muted">{items.length === 0 ? "—" : "That's the last song"}</span>
@@ -284,7 +290,7 @@ export function SetlistRail({
                   </span>
                 )}
                 <span className="flex-none font-mono text-xs text-muted">
-                  {deriveSong(item.song.original_key, item.settings).soundingKey || item.song.original_key}
+                  {keys.get(item.id)}
                 </span>
               </>
             );

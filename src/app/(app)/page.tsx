@@ -2,9 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { SearchForm } from "@/components/search-form";
 import { SongFilterPanel } from "@/components/song-filters";
-import { getCurrentChurch } from "@/lib/church";
 import { formatDay } from "@/lib/setlist-expiry";
-import { listSetlists } from "@/lib/setlists";
+import { getNextSetlist } from "@/lib/setlists";
 import { PAGE_SIZE, activeFilterCount, filtersToParams, pageList, parseSongFilters, type SongFilters } from "@/lib/song-filters";
 import { getSongFacets, searchSongs } from "@/lib/songs";
 
@@ -22,16 +21,17 @@ const href = (f: SongFilters, page: number) => {
 };
 
 async function Library({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
-  const church = await getCurrentChurch();
-  if (!church) return null;
-
   const filters = parseSongFilters(await searchParams);
-  const [result, facets, setlists] = await Promise.all([searchSongs(filters), getSongFacets(), listSetlists()]);
-  const { songs, total, page, pages } = result;
   const narrowed = filters.q !== "" || activeFilterCount(filters) > 0;
-  // The welcome section is for arriving at the library, not for paging through or searching it.
-  const welcome = !narrowed && page === 1;
-  const nextSetlist = setlists.upcoming[0];
+  // The next-setlist banner is for arriving at the library, not for paging through or searching it,
+  // so it isn't even asked for then. Everything else is asked for at once.
+  const welcome = !narrowed && filters.page === 1;
+  const [result, facets, nextSetlist] = await Promise.all([
+    searchSongs(filters),
+    getSongFacets(),
+    welcome ? getNextSetlist() : Promise.resolve(null),
+  ]);
+  const { songs, total, page, pages } = result;
 
   const first = (page - 1) * PAGE_SIZE + 1;
   const summary =

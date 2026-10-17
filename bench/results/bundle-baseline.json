@@ -1,0 +1,74 @@
+[
+  {
+    "route": "/setlists/[id]",
+    "rawKB": 782.6,
+    "gzipKB": 227.6,
+    "chunks": 9
+  },
+  {
+    "route": "/songs/import",
+    "rawKB": 574.8,
+    "gzipKB": 179.8,
+    "chunks": 9
+  },
+  {
+    "route": "/songs/[id]/edit",
+    "rawKB": 503.5,
+    "gzipKB": 152,
+    "chunks": 9
+  },
+  {
+    "route": "/songs/new",
+    "rawKB": 503.5,
+    "gzipKB": 152,
+    "chunks": 9
+  },
+  {
+    "route": "/songs/[id]",
+    "rawKB": 491.3,
+    "gzipKB": 148.7,
+    "chunks": 8
+  },
+  {
+    "route": "/",
+    "rawKB": 482.8,
+    "gzipKB": 145.8,
+    "chunks": 8
+  },
+  {
+    "route": "/setlists",
+    "rawKB": 470,
+    "gzipKB": 141.1,
+    "chunks": 8
+  },
+  {
+    "route": "/forgot-password",
+    "rawKB": 460.4,
+    "gzipKB": 137.8,
+    "chunks": 8
+  },
+  {
+    "route": "/reset-password",
+    "rawKB": 460.4,
+    "gzipKB": 137.8,
+    "chunks": 8
+  },
+  {
+    "route": "/login",
+    "rawKB": 460.1,
+    "gzipKB": 137.6,
+    "chunks": 8
+  },
+  {
+    "route": "/welcome",
+    "rawKB": 454.3,
+    "gzipKB": 135.7,
+    "chunks": 7
+  },
+  {
+    "route": "/_not-found",
+    "rawKB": 446.7,
+    "gzipKB": 132.5,
+    "chunks": 6
+  }
+]

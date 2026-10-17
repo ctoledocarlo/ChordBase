@@ -1,0 +1,137 @@
+{
+  "label": "optimized",
+  "latencyMs": 30,
+  "runs": 12,
+  "results": [
+    {
+      "page": "action: put song on stage",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 59.4,
+      "totalMs": 60.4,
+      "dbCalls": 1,
+      "dbWaves": 1,
+      "htmlKB": 0.1
+    },
+    {
+      "page": "action: change a key",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 45.8,
+      "totalMs": 46.6,
+      "dbCalls": 1,
+      "dbWaves": 1,
+      "htmlKB": 0.1
+    },
+    {
+      "page": "action: send a chat message",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 45.9,
+      "totalMs": 46.8,
+      "dbCalls": 1,
+      "dbWaves": 1,
+      "htmlKB": 0.2
+    },
+    {
+      "page": "action: add a song",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 93.4,
+      "totalMs": 94.5,
+      "dbCalls": 4,
+      "dbWaves": 2,
+      "htmlKB": 2.2
+    },
+    {
+      "page": "action: reorder (14 songs)",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 60.9,
+      "totalMs": 61.4,
+      "dbCalls": 14,
+      "dbWaves": 1,
+      "htmlKB": 0.1
+    },
+    {
+      "page": "action: catch up (refetch)",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 49.2,
+      "totalMs": 54.5,
+      "dbCalls": 3,
+      "dbWaves": 1,
+      "htmlKB": 35.7
+    },
+    {
+      "page": "action: search to add",
+      "path": "/",
+      "status": 200,
+      "ttfbMs": 61.4,
+      "totalMs": 62.1,
+      "dbCalls": 1,
+      "dbWaves": 1,
+      "htmlKB": 4.2
+    },
+    {
+      "page": "home (songs list)",
+      "path": "/",
+      "status": 200,
+      "ttfbMs": 7,
+      "totalMs": 79.5,
+      "dbCalls": 3,
+      "dbWaves": 1,
+      "htmlKB": 65.3
+    },
+    {
+      "page": "search a word",
+      "path": "/?q=grace",
+      "status": 200,
+      "ttfbMs": 6.6,
+      "totalMs": 69.4,
+      "dbCalls": 2,
+      "dbWaves": 1,
+      "htmlKB": 69.3
+    },
+    {
+      "page": "filter + sort",
+      "path": "/?key=G&key=D&sort=tempo",
+      "status": 200,
+      "ttfbMs": 7,
+      "totalMs": 76.6,
+      "dbCalls": 2,
+      "dbWaves": 1,
+      "htmlKB": 64.3
+    },
+    {
+      "page": "song page",
+      "path": "/songs/00000000-0000-4000-8000-0000000000c1",
+      "status": 200,
+      "ttfbMs": 6.8,
+      "totalMs": 70.9,
+      "dbCalls": 3,
+      "dbWaves": 1,
+      "htmlKB": 81.5
+    },
+    {
+      "page": "setlists list",
+      "path": "/setlists",
+      "status": 200,
+      "ttfbMs": 6.9,
+      "totalMs": 95.2,
+      "dbCalls": 3,
+      "dbWaves": 1,
+      "htmlKB": 132.7
+    },
+    {
+      "page": "open a setlist",
+      "path": "/setlists/00000000-0000-4000-8000-0000000000b1",
+      "status": 200,
+      "ttfbMs": 6.7,
+      "totalMs": 77.6,
+      "dbCalls": 5,
+      "dbWaves": 1,
+      "htmlKB": 62
+    }
+  ]
+}

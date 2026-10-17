@@ -4,7 +4,6 @@ import { DeleteButton } from "@/components/delete-button";
 import { NewSetlist } from "@/components/new-setlist";
 import { SetlistDateRange } from "@/components/setlist-date-range";
 import { SearchForm } from "@/components/search-form";
-import { getCurrentChurch } from "@/lib/church";
 import { deleteSetlist } from "./actions";
 import { formatDay } from "@/lib/setlist-expiry";
 import { listSetlists, type SetlistSummary } from "@/lib/setlists";
@@ -18,9 +17,6 @@ export default function SetlistsPage({ searchParams }: PageProps<"/setlists">) {
 }
 
 async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">["searchParams"] }) {
-  const church = await getCurrentChurch();
-  if (!church) return null;
-
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => ((Array.isArray(v) ? v[0] : v) ?? "").trim();
   const day = (v: string) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { isValidChord } from "@/lib/chords";
 import { getCurrentChurch } from "@/lib/church";
+import { forgetSongFacets } from "@/lib/songs";
 import { MAX_BATCH } from "@/lib/import/limits";
 import { createClient } from "@/lib/supabase/server";
 
@@ -76,6 +77,7 @@ export async function importSongs(items: ImportItem[]): Promise<ImportResult> {
     rowIndex.forEach((index) => failed.push({ index, error: "Couldn't save this song. Please try again." }));
     return { created: 0, failed };
   }
+  forgetSongFacets();
   revalidatePath("/", "layout");
   return { created: rows.length, failed };
 }

@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isValidChord } from "@/lib/chords";
-import { getCurrentChurch } from "@/lib/church";
+import { getCurrentChurch, isSignedIn } from "@/lib/church";
 import { createClient } from "@/lib/supabase/server";
-import { findSongs as findSongsInLibrary, getSong, type PresetSettings, type SongSummary } from "@/lib/songs";
+import { findSongs as findSongsInLibrary, forgetSongFacets, getSong, type PresetSettings, type SongSummary } from "@/lib/songs";
 
 export type SongFormState = { error?: string };
 
@@ -83,6 +83,7 @@ export async function saveSong(
     songId = data.id;
   }
 
+  forgetSongFacets();
   revalidatePath("/", "layout");
   redirect(`/songs/${songId}`);
 }
@@ -95,6 +96,7 @@ export async function deleteSong(formData: FormData) {
     const supabase = await createClient();
     await supabase.from("songs").delete().eq("id", id);
   }
+  forgetSongFacets();
   revalidatePath("/", "layout");
   redirect("/");
 }
@@ -182,7 +184,6 @@ export async function removeChordShortcut(id: string): Promise<ShortcutResult> {
 
 /** Songs matching what was typed in a search box (title, artist or words), for "add a song" boxes. */
 export async function findSongs(query: string): Promise<SongSummary[]> {
-  const church = await getCurrentChurch();
-  if (!church || typeof query !== "string" || query.length > 100) return [];
+  if (typeof query !== "string" || query.length > 100 || !(await isSignedIn())) return [];
   return findSongsInLibrary(query);
 }

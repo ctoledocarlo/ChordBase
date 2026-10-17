@@ -1,0 +1,198 @@
+{
+  "label": "baseline",
+  "rows": 1400,
+  "setlists": 60,
+  "songsTableSize": "7744 kB",
+  "seedMs": 1028,
+  "results": [
+    {
+      "name": "list_default",
+      "what": "Songs page, first 25 by title",
+      "median": 4.73,
+      "p95": 5.38,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "list_deep_page",
+      "what": "Songs page 40",
+      "median": 4.8,
+      "p95": 6.11,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "search_rare_word",
+      "what": "Search a word in ~2% of songs",
+      "median": 30.96,
+      "p95": 36.59,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "search_common_word",
+      "what": "Search a word in ~40% of songs",
+      "median": 30.9,
+      "p95": 37.84,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "search_lyrics",
+      "what": "Search three lyric words",
+      "median": 33.14,
+      "p95": 40.59,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "filter_keys_tempo",
+      "what": "Filter: keys G/D/Em, tempo 60-100",
+      "median": 3.38,
+      "p95": 4.35,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "filter_minor",
+      "what": "Filter: minor keys",
+      "median": 4.59,
+      "p95": 6.13,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "sort_tempo",
+      "what": "Sort by tempo",
+      "median": 3.57,
+      "p95": 5.14,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "sort_recent",
+      "what": "Sort by recently changed",
+      "median": 4.12,
+      "p95": 6.79,
+      "rows": 1,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "facets",
+      "what": "Filter choices (keys, artists, ...)",
+      "median": 4.19,
+      "p95": 6.64,
+      "rows": 1,
+      "plan": ""
+    },
+    {
+      "name": "list_default_new",
+      "what": "Songs page, first 25 by title (function)",
+      "error": "function public.songs_page() does not exist"
+    },
+    {
+      "name": "list_deep_page_new",
+      "what": "Songs page 40 (function)",
+      "error": "function public.songs_page(p_offset => integer) does not exist"
+    },
+    {
+      "name": "search_rare_word_new",
+      "what": "Search a word in ~2% of songs (function)",
+      "error": "function public.songs_page(p_q => unknown, p_tokens => text[], p_with_body => boolean) does not exist"
+    },
+    {
+      "name": "search_common_word_new",
+      "what": "Search a word in ~40% of songs (function)",
+      "error": "function public.songs_page(p_q => unknown, p_tokens => text[], p_with_body => boolean) does not exist"
+    },
+    {
+      "name": "search_lyrics_new",
+      "what": "Search three lyric words (function)",
+      "error": "function public.songs_page(p_q => unknown, p_tokens => text[], p_with_body => boolean) does not exist"
+    },
+    {
+      "name": "filter_keys_tempo_new",
+      "what": "Filter: keys G/D/Em, tempo 60-100 (function)",
+      "error": "function public.songs_page(p_keys => text[], p_tempo_min => integer, p_tempo_max => integer) does not exist"
+    },
+    {
+      "name": "filter_minor_new",
+      "what": "Filter: minor keys (function)",
+      "error": "function public.songs_page(p_mode => unknown) does not exist"
+    },
+    {
+      "name": "sort_tempo_new",
+      "what": "Sort by tempo (function)",
+      "error": "function public.songs_page(p_sort => unknown) does not exist"
+    },
+    {
+      "name": "sort_recent_new",
+      "what": "Sort by recently changed (function)",
+      "error": "function public.songs_page(p_sort => unknown) does not exist"
+    },
+    {
+      "name": "facets_new",
+      "what": "Filter choices, one pass",
+      "median": 4.35,
+      "p95": 5.41,
+      "rows": 1,
+      "plan": ""
+    },
+    {
+      "name": "home_setlists",
+      "what": "Home page: all setlists with counts + purge (old)",
+      "median": 4,
+      "p95": 4.65,
+      "rows": 60,
+      "plan": ""
+    },
+    {
+      "name": "home_next_setlist_new",
+      "what": "Home page: just the next setlist",
+      "median": 1.16,
+      "p95": 2.78,
+      "rows": 1,
+      "plan": "Seq Scan, Bitmap Heap Scan, Bitmap Index Scan(setlist_items_setlist_id_idx)"
+    },
+    {
+      "name": "song_page_setlists_new",
+      "what": "Song page: setlists to add to (names only)",
+      "median": 1.38,
+      "p95": 2.59,
+      "rows": 60,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "setlist_open",
+      "what": "Open a setlist: its songs with their text",
+      "median": 2.26,
+      "p95": 2.93,
+      "rows": 14,
+      "plan": "Bitmap Heap Scan, Bitmap Index Scan(setlist_items_setlist_id_idx), Index Scan(songs_pkey)"
+    },
+    {
+      "name": "setlist_messages",
+      "what": "Chat: last 100 messages",
+      "median": 2.71,
+      "p95": 3.25,
+      "rows": 100,
+      "plan": "Seq Scan"
+    },
+    {
+      "name": "delete_song",
+      "what": "Delete a song that is in setlists (rolled back)",
+      "median": 2.43,
+      "p95": 3.33,
+      "rows": 0,
+      "plan": ""
+    },
+    {
+      "name": "delete_setlist_item",
+      "what": "Remove a song from a setlist (rolled back)",
+      "median": 0.74,
+      "p95": 0.86,
+      "rows": 0,
+      "plan": ""
+    }
+  ]
+}

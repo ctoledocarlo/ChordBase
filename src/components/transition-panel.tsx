@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { autoTransition, type Transition, type TransitionMode } from "@/lib/setlist-transition";
 import type { SetlistItem } from "@/lib/setlists";
 import { Group } from "./song-settings";
@@ -24,7 +25,8 @@ export function TransitionPanel({
   onChange: (transition: Transition) => void;
 }) {
   const t = from.transition;
-  const suggestion = autoTransition(from, to);
+  // Reading both songs to suggest chords isn't free, so it's only redone when either song changes.
+  const suggestion = useMemo(() => autoTransition(from, to), [from, to]);
   const keyed = from.song.original_key !== "" && to.song.original_key !== "";
 
   return (

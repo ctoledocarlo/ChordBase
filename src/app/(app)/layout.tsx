@@ -12,9 +12,10 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         </Suspense>
       }
     >
-      <Suspense fallback={<p className="text-muted">Loading…</p>}>
-        <ChurchGate>{children}</ChurchGate>
+      <Suspense fallback={null}>
+        <ChurchNotice />
       </Suspense>
+      <Suspense fallback={<p className="text-muted">Loading…</p>}>{children}</Suspense>
     </AppShell>
   );
 }
@@ -33,17 +34,16 @@ async function ChurchBar() {
   );
 }
 
-// Server-side check, in addition to proxy.ts: a signed-in login that isn't
-// linked to a church sees a message instead of the app.
-async function ChurchGate({ children }: { children: React.ReactNode }) {
+// A login that isn't linked to a church sees a message. The check runs beside the page rather than in
+// front of it, so the page's own data is already on its way while the check is made; row level security
+// shows an unlinked login nothing, so the page is empty for them either way.
+async function ChurchNotice() {
   const church = await getCurrentChurch();
-  if (!church) {
-    return (
-      <p role="alert">
-        This login isn&apos;t linked to a church yet. Ask the ChordBase admin to
-        finish setting it up.
-      </p>
-    );
-  }
-  return children;
+  if (church) return null;
+  return (
+    <p role="alert">
+      This login isn&apos;t linked to a church yet. Ask the ChordBase admin to
+      finish setting it up.
+    </p>
+  );
 }

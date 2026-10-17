@@ -5,7 +5,7 @@ import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "rea
 import type { ImportItem, ImportResult } from "@/app/(app)/songs/import/actions";
 import { normalize } from "@/lib/import/chart";
 import { MAX_BATCH } from "@/lib/import/limits";
-import { importDeck, type ImportedSong } from "@/lib/import/song";
+import type { ImportedSong } from "@/lib/import/song";
 import type { SongName } from "@/lib/songs";
 import { KEYS } from "./song-editor-shared";
 import { SongSheet } from "./song-sheet";
@@ -91,6 +91,8 @@ export function ImportSongs({ existing, onImport }: Props) {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
+        // The reader (and the libraries it uses) is fetched when the first file is chosen, not with the page.
+        const { importDeck } = await import("@/lib/import/song");
         const songs = importDeck(file.name, new Uint8Array(await file.arrayBuffer()));
         if (songs.length === 0) failed.push({ name: file.name, message: "No song text was found in this file." });
         for (const song of songs) {

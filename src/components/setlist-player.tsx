@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import {
   addSetlistItem,
   deleteSetlist,
@@ -714,7 +714,7 @@ export function SetlistPlayer({
   );
 }
 
-function CurrentSong({ item, live }: { item: SetlistItem; live: boolean }) {
+const CurrentSong = memo(function CurrentSong({ item, live }: { item: SetlistItem; live: boolean }) {
   const { keyLabel } = deriveSong(item.song.original_key, item.settings);
   const sections = useSongSections(effectiveBody(item), item.song.original_key, item.settings);
   return (
@@ -726,4 +726,4 @@ function CurrentSong({ item, live }: { item: SetlistItem; live: boolean }) {
       showChords={item.settings.showChords}
     />
   );
-}
+});

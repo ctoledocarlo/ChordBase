@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getCurrentChurch } from "@/lib/church";
+import { getCurrentChurch, isSignedIn } from "@/lib/church";
 import { DEFAULT_KEEP_MONTHS, expiryFrom, isKeepMonths } from "@/lib/setlist-expiry";
 import { defaultSettings, validSettings } from "@/lib/setlist-settings";
 import {
@@ -115,8 +115,7 @@ export async function updateSetlist(
   keepMonths: number | null = null,
   clientId?: string,
 ): Promise<SetlistResult & { expires_at?: string }> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   const trimmed = name.trim();
   if (!trimmed || trimmed.length > 80) return { error: "Give the setlist a short name." };
   const date = parseDate(serviceDate);
@@ -137,8 +136,7 @@ export async function updateSetlist(
 }
 
 export async function deleteSetlist(formData: FormData) {
-  const church = await getCurrentChurch();
-  if (!church) redirect("/login");
+  if (!(await isSignedIn())) redirect("/login");
   const id = text(formData, "id");
   if (id) {
     const supabase = await createClient();
@@ -173,30 +171,29 @@ export async function addSetlistItem(
   index: number | null,
   clientId?: string,
 ): Promise<{ item?: SetlistItem; error?: string }> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
 
   const supabase = await createClient();
-  // RLS hides other churches' songs and setlists, so these also prove both are theirs.
-  const [{ data: song }, { data: setlist }] = await Promise.all([
+  // RLS hides other churches' songs and setlists, so these also prove both are theirs. All three are read at once.
+  const [{ data: song }, { data: setlist }, { data: existing }] = await Promise.all([
     supabase.from("songs").select("default_capo").eq("id", songId).maybeSingle<{ default_capo: number }>(),
     supabase.from("setlists").select("id").eq("id", setlistId).maybeSingle<{ id: string }>(),
+    supabase
+      .from("setlist_items")
+      .select("id")
+      .eq("setlist_id", setlistId)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true }),
   ]);
   if (!song || !setlist) return { error: "That song or setlist no longer exists." };
 
-  const { data: existing } = await supabase
-    .from("setlist_items")
-    .select("id")
-    .eq("setlist_id", setlistId)
-    .order("position", { ascending: true })
-    .order("created_at", { ascending: true });
   const ids = (existing ?? []).map((r: { id: string }) => r.id);
   const at = index === null || index < 0 || index > ids.length ? ids.length : index;
 
   const { data, error } = await supabase
     .from("setlist_items")
+    // church_id is left out: the database fills in the signed-in login's church.
     .insert({
-      church_id: church.id,
       setlist_id: setlistId,
       song_id: songId,
       position: at,
@@ -218,24 +215,21 @@ export async function addSetlistItem(
 }
 
 export async function removeSetlistItem(setlistId: string, itemId: string): Promise<SetlistResult> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   const supabase = await createClient();
   const { error } = await supabase.from("setlist_items").delete().eq("id", itemId).eq("setlist_id", setlistId);
   return error ? { error: "Couldn't remove that song." } : {};
 }
 
 export async function reorderSetlistItems(setlistId: string, ids: string[], clientId?: string): Promise<SetlistResult> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   if (ids.length > 500) return { error: "That setlist is too long." };
   return (await renumber(setlistId, ids, clientId)) ? {} : { error: "Couldn't save the new order." };
 }
 
 /** Saves how one song is set up in this setlist (key, capo, text size, chords on or off). */
 export async function saveItemSettings(itemId: string, settings: PresetSettings, clientId?: string): Promise<SetlistResult> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   if (!validSettings(settings)) return { error: "Those settings aren't valid." };
   const supabase = await createClient();
   const { error } = await supabase
@@ -249,8 +243,7 @@ const MAX_BODY = 200_000;
 
 /** Saves this setlist's own version of a song's chords (null goes back to the song as it is). */
 export async function saveItemBody(itemId: string, body: string | null, clientId?: string): Promise<SetlistResult> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   if (body !== null && (typeof body !== "string" || body.length > MAX_BODY)) return { error: "That song is too long." };
   const supabase = await createClient();
   const { error } = await supabase
@@ -266,8 +259,7 @@ export async function saveItemBody(itemId: string, body: string | null, clientId
 export async function getSetlistState(
   setlistId: string,
 ): Promise<{ setlist: Setlist; items: SetlistItem[]; messages: ChatMessage[] } | null> {
-  const church = await getCurrentChurch();
-  if (!church) return null;
+  if (!(await isSignedIn())) return null;
   const [found, messages] = await Promise.all([getSetlist(setlistId), listMessages(setlistId)]);
   return found ? { ...found, messages } : null;
 }
@@ -281,8 +273,7 @@ export async function sendMessage(
   role: string,
   clientId: string,
 ): Promise<{ message?: ChatMessage; error?: string }> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   const text = typeof body === "string" ? body.trim() : "";
   if (!text) return { error: "Type a message first." };
   if (text.length > MAX_MESSAGE) return { error: `Keep it under ${MAX_MESSAGE} characters.` };
@@ -293,7 +284,8 @@ export async function sendMessage(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("setlist_messages")
-    .insert({ church_id: church.id, setlist_id: setlistId, sender_role: role, sender, body: text })
+    // church_id is left out: the database fills in the signed-in login's church.
+    .insert({ setlist_id: setlistId, sender_role: role, sender, body: text })
     .select(MESSAGE_COLUMNS)
     .single<ChatMessage>();
   if (error || !data) return { error: "Couldn't send that. Please try again." };
@@ -302,8 +294,7 @@ export async function sendMessage(
 
 /** Puts a song on stage: Stage and Viewer screens switch to it. Null clears the choice. */
 export async function setActiveItem(setlistId: string, itemId: string | null, clientId?: string): Promise<SetlistResult> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   const supabase = await createClient();
   const { error } = await supabase
     .from("setlists")
@@ -319,8 +310,7 @@ export async function saveItemTransition(
   chords: string,
   clientId?: string,
 ): Promise<SetlistResult> {
-  const church = await getCurrentChurch();
-  if (!church) return { error: NOT_SIGNED_IN };
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   if (mode !== "auto" && mode !== "manual" && mode !== "none") return { error: "Choose auto, manual or none." };
   const text = typeof chords === "string" ? chords.trim() : "";
   if (text.length > 200) return { error: "Keep the transition under 200 characters." };
