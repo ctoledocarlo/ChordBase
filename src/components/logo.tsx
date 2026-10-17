@@ -11,11 +11,11 @@ export function LogoMark({ size = 24, className = "" }: { size?: number; classNa
 }
 
 /** The mark followed by the name. Text takes its colour and size from where it is placed. */
-export function Logo({ size = 24, className = "" }: { size?: number; className?: string }) {
+export function Logo({ size = 24, className = "", iconOnlyOnPhone = false }: { size?: number; className?: string; /** Hide the name on a phone, keeping just the mark. */ iconOnlyOnPhone?: boolean }) {
   return (
     <span className={`inline-flex items-center gap-2.5 font-semibold tracking-tight ${className}`}>
       <LogoMark size={size} />
-      ChordBase
+      <span className={iconOnlyOnPhone ? "max-sm:sr-only" : undefined}>ChordBase</span>
     </span>
   );
 }

@@ -16,6 +16,8 @@ import {
   useSidebarWidth,
 } from "./sidebar-width";
 import { ThemeToggle } from "./theme-toggle";
+import { HelpMenu } from "./tutorial/help-menu";
+import { TutorialProvider, TutorialRouteWatcher } from "./tutorial/tutorial-provider";
 
 /**
  * App frame: a navbar that stays at the top, and a sidebar that each page
@@ -53,18 +55,24 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
   }
 
   return (
+    <TutorialProvider openSidebar={setOpen}>
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-background">
-        <div className="flex h-14 items-stretch gap-6 px-4 lg:px-6">
-          <Link href="/" className="flex items-center text-base font-semibold tracking-tight">
-            <Logo size={26} />
+        <div className="flex h-14 items-stretch gap-3 px-3 sm:gap-6 sm:px-4 lg:px-6">
+          <Link href="/" aria-label="ChordBase, home" className="flex items-center text-base font-semibold tracking-tight">
+            <Logo size={26} iconOnlyOnPhone />
           </Link>
           <Suspense fallback={null}>
             <MainNav />
           </Suspense>
-          <div className="ml-auto flex items-center gap-2">
-            {account}
-            <ThemeToggle />
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            <Suspense fallback={null}>
+              <HelpMenu />
+            </Suspense>
+            <div data-tour="account">{account}</div>
+            <span data-tour="theme" className="flex">
+              <ThemeToggle />
+            </span>
           </div>
         </div>
       </header>
@@ -72,7 +80,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
       <div className="flex flex-1 flex-col lg:flex-row">
         <Suspense fallback={null}>
           <SidebarGate>
-          <div className="border-b border-line px-4 py-2 lg:hidden">
+          <div className="border-b border-line px-3 py-1.5 sm:px-4 lg:hidden">
             <button type="button" onClick={() => setOpen(true)} className="btn">
               <MenuIcon /> Page options
             </button>
@@ -82,8 +90,9 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
 
           <aside
             aria-label="Page options"
+            data-tour="sidebar"
             style={{ "--sidebar-w": `${width}px` } as CSSProperties}
-            className={`fixed inset-y-0 left-0 z-40 w-[var(--sidebar-w)] border-r border-line bg-background transition-transform lg:sticky lg:top-14 lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:shrink-0 lg:translate-x-0 lg:transition-none ${
+            className={`fixed inset-y-0 left-0 z-40 w-[min(20rem,85vw)] border-r border-line bg-background transition-transform lg:sticky lg:top-14 lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:w-[var(--sidebar-w)] lg:shrink-0 lg:translate-x-0 lg:transition-none ${
               open ? "translate-x-0" : "-translate-x-full"
             }`}
           >
@@ -121,7 +130,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
           </SidebarGate>
         </Suspense>
 
-        <main className="min-w-0 flex-1 px-4 py-8 lg:px-10">
+        <main className="min-w-0 flex-1 px-4 py-5 sm:py-8 lg:px-10">
           <Suspense fallback={null}>
             <PageTopBack />
           </Suspense>
@@ -129,6 +138,10 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
         </main>
       </div>
     </div>
+    <Suspense fallback={null}>
+      <TutorialRouteWatcher />
+    </Suspense>
+    </TutorialProvider>
   );
 }
 
@@ -139,7 +152,7 @@ function MainNav() {
     { href: "/", label: "Songs", soon: false, active: pathname === "/" || pathname.startsWith("/songs") },
   ];
   return (
-    <nav aria-label="Main" className="flex items-stretch gap-5 text-sm">
+    <nav aria-label="Main" data-tour="nav" className="flex items-stretch gap-4 text-sm sm:gap-5">
       {items.map((it) => (
         <Link
           key={it.href}

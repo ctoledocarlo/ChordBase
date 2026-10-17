@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-export const SIDEBAR_DEFAULT = 144; // 9rem
+export const SIDEBAR_DEFAULT = 288; // 18rem, the same as the largest
 export const SIDEBAR_MIN = 112; // 7rem
 export const SIDEBAR_MAX = 288; // 18rem
 

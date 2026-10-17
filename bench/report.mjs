@@ -176,7 +176,7 @@ ${table(["", "Mean time", "Runs per second"], computeRows)}
 - Searching for words used to read every song in full. Row level security stops Postgres from using an index
   for "contains" searches, so the search now runs in a database function (\`songs_page\`) that checks the church
   itself and can use new trigram indexes on title, artist and lyrics. It also counts the matches in the same
-  pass rather than a second one. A test (\`npm run bench:verify\`) checks it returns exactly what the plain
+  pass rather than a second one. Searches are ordered best match first (exact title, title starts with it, title has it, the lyrics have the words together, the artist, then the lyrics with the words closest together), at no measurable cost. A test (\`npm run bench:verify\`) checks it returns exactly what the plain
   queries do and never another church's songs.
 - Indexes for the orders the song list offers (title, artist, key, tempo, recently changed), and for the
   setlist list. The old index was on \`lower(title)\`, which the list never used.

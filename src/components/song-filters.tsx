@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, type FormEvent } from "react";
 import { parseChord, pitchClass } from "@/lib/chords";
-import { SORTS, activeFilterCount, filtersToParams, type SongFacets, type SongFilters } from "@/lib/song-filters";
+import { SORTS, activeFilterCount, defaultSort, filtersToParams, type SongFacets, type SongFilters } from "@/lib/song-filters";
 import { SidebarPortal } from "./sidebar-portal";
 import { Group } from "./song-settings";
 
@@ -30,8 +30,11 @@ export function SongFilterPanel({ filters, facets }: { filters: SongFilters; fac
 
   function apply(form: HTMLFormElement) {
     const params = new URLSearchParams();
-    for (const [name, value] of new FormData(form)) {
-      if (typeof value === "string" && value.trim() !== "" && !(name === "sort" && value === "title")) {
+    const data = new FormData(form);
+    const q = String(data.get("q") ?? "");
+    for (const [name, value] of data) {
+      // The usual order for what's on screen (best match while searching, else title) isn't written into the address.
+      if (typeof value === "string" && value.trim() !== "" && !(name === "sort" && value === defaultSort(q))) {
         params.append(name, value.trim());
       }
     }
@@ -43,6 +46,7 @@ export function SongFilterPanel({ filters, facets }: { filters: SongFilters; fac
     <SidebarPortal>
       <form
         key={formKey}
+        data-tour="songs-filters"
         onSubmit={(e: FormEvent<HTMLFormElement>) => {
           e.preventDefault();
           apply(e.currentTarget);
@@ -57,7 +61,7 @@ export function SongFilterPanel({ filters, facets }: { filters: SongFilters; fac
 
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium">Filters{active > 0 ? ` (${active})` : ""}</h2>
-          {(active > 0 || filters.sort !== "title") && (
+          {(active > 0 || filters.sort !== defaultSort(filters.q)) && (
             <Link href={filters.q ? `/?q=${encodeURIComponent(filters.q)}` : "/"} className="text-sm text-muted underline hover:text-foreground">
               Clear all
             </Link>
@@ -66,7 +70,7 @@ export function SongFilterPanel({ filters, facets }: { filters: SongFilters; fac
 
         <Group title="Sort by">
           <select name="sort" defaultValue={filters.sort} className="field field-sm">
-            {SORTS.map((s) => (
+            {SORTS.filter((s) => s.value !== "relevance" || filters.q !== "").map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
               </option>

@@ -26,7 +26,7 @@ async function ChurchBar() {
     <div className="flex items-center gap-3 text-sm">
       {church && <span className="hidden font-medium text-muted sm:inline">{church.name}</span>}
       <form action={signOut}>
-        <button type="submit" className="underline">
+        <button type="submit" className="whitespace-nowrap text-sm underline">
           Log out
         </button>
       </form>

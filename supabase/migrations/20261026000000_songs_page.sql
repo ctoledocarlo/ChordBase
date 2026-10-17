@@ -10,6 +10,10 @@
 -- It only ever returns the signed-in login's own church's songs: with no login, my_church_id() is
 -- null and nothing matches.
 
+-- Safe to run again: an earlier version took one parameter fewer.
+drop function if exists public.songs_page(text, text[], text[], text, text, integer, integer, text, integer, text, integer, integer, boolean);
+drop function if exists public.songs_page(text, text[], text[], text, text, integer, integer, text, integer, text, integer, integer, boolean, text);
+
 create or replace function public.songs_page(
   p_q           text    default '',
   p_tokens      text[]  default '{}',
@@ -23,7 +27,9 @@ create or replace function public.songs_page(
   p_sort        text    default 'title',
   p_limit       integer default 25,
   p_offset      integer default 0,
-  p_with_body   boolean default false
+  p_with_body   boolean default false,
+  -- The search as one flattened phrase (lower case, no punctuation), for ranking songs that have it whole.
+  p_phrase      text    default ''
 )
 returns table (
   id           uuid,
@@ -57,6 +63,11 @@ declare
   where_sql text;
   sql_text text;
   text_search boolean := q <> '';
+  -- For "best match" ordering:
+  phrase text := replace(btrim(coalesce(p_phrase, '')), chr(1), '');
+  tier   text;
+  span   text := '0';
+  locs   text[] := '{}';
 begin
   -- Words to look for: in the title or artist as typed, or every word somewhere in the lyrics.
   if text_search then
@@ -96,14 +107,40 @@ begin
   end if;
   where_sql := array_to_string(conds, ' and ');
 
-  -- The id keeps the order steady between pages when titles match.
-  sorted := case p_sort
-    when 'artist' then a || '.artist, ' || a || '.title, ' || a || '.id'
-    when 'key'    then a || '.original_key, ' || a || '.title, ' || a || '.id'
-    when 'tempo'  then a || '.tempo asc nulls last, ' || a || '.title, ' || a || '.id'
-    when 'recent' then a || '.updated_at desc, ' || a || '.id'
-    else               a || '.title, ' || a || '.id'
-  end;
+  if p_sort = 'relevance' and text_search then
+    -- "Best match": the closer a song is to what was typed, the nearer the top.
+    --   0 the title is exactly it       1 the title starts with it     2 the title has it in it
+    --   3 the lyrics have the words together, as typed
+    --   4 the artist has it in it       5 the lyrics have all the words, somewhere
+    -- Among the lyric matches, the words that sit closest together come first (the distance from the first
+    -- of them to the last). Ties go to the title, then the id, so pages stay steady.
+    tier := 'case'
+      || ' when lower(' || a || '.title) = ' || quote_literal(lower(q)) || ' then 0'
+      || ' when ' || a || '.title ilike ' || quote_literal(replace(replace(replace(q, '\', '\\'), '%', '\%'), '_', '\_') || '%') || ' then 1'
+      || ' when ' || a || '.title ilike ' || quote_literal(like_q) || ' then 2'
+      || case
+           when phrase <> '' then ' when ' || a || '.lyrics like ' || quote_literal('%' || replace(replace(replace(phrase, '\', '\\'), '%', '\%'), '_', '\_') || '%') || ' then 3'
+           else ''
+         end
+      || ' when ' || a || '.artist ilike ' || quote_literal(like_q) || ' then 4'
+      || ' else 5 end';
+    foreach tok in array coalesce(p_tokens, '{}') loop
+      locs := locs || ('strpos(' || a || '.lyrics, ' || quote_literal(replace(tok, chr(1), '')) || ')');
+    end loop;
+    if cardinality(locs) > 1 then
+      span := 'greatest(' || array_to_string(locs, ', ') || ') - least(' || array_to_string(locs, ', ') || ')';
+    end if;
+    sorted := tier || ', case when ' || tier || ' in (3, 5) then ' || span || ' else 0 end, ' || a || '.title, ' || a || '.id';
+  else
+    -- The id keeps the order steady between pages when titles match.
+    sorted := case p_sort
+      when 'artist' then a || '.artist, ' || a || '.title, ' || a || '.id'
+      when 'key'    then a || '.original_key, ' || a || '.title, ' || a || '.id'
+      when 'tempo'  then a || '.tempo asc nulls last, ' || a || '.title, ' || a || '.id'
+      when 'recent' then a || '.updated_at desc, ' || a || '.id'
+      else               a || '.title, ' || a || '.id'
+    end;
+  end if;
 
   sql_text :=
     'select ' || a || '.id, ' || a || '.title, ' || a || '.artist, ' || a || '.original_key, ' || a || '.tempo, '
@@ -122,5 +159,5 @@ begin
 end
 $fn$;
 
-revoke all on function public.songs_page(text, text[], text[], text, text, integer, integer, text, integer, text, integer, integer, boolean) from public, anon;
-grant execute on function public.songs_page(text, text[], text[], text, text, integer, integer, text, integer, text, integer, integer, boolean) to authenticated;
+revoke all on function public.songs_page(text, text[], text[], text, text, integer, integer, text, integer, text, integer, integer, boolean, text) from public, anon;
+grant execute on function public.songs_page(text, text[], text[], text, text, integer, integer, text, integer, text, integer, integer, boolean, text) to authenticated;

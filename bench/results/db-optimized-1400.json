@@ -2,222 +2,222 @@
   "label": "optimized",
   "rows": 1400,
   "setlists": 60,
-  "songsTableSize": "9344 kB",
-  "seedMs": 1353,
+  "songsTableSize": "9352 kB",
+  "seedMs": 913,
   "results": [
     {
       "name": "list_default",
       "what": "Songs page, first 25 by title",
-      "median": 3.52,
-      "p95": 5.29,
+      "median": 2.02,
+      "p95": 4.71,
       "rows": 1,
       "plan": "Index Scan(songs_church_title_id_idx)"
     },
     {
       "name": "list_deep_page",
       "what": "Songs page 40",
-      "median": 5.16,
-      "p95": 6.39,
+      "median": 2.79,
+      "p95": 4.8,
       "rows": 1,
       "plan": "Seq Scan"
     },
     {
       "name": "search_rare_word",
       "what": "Search a word in ~2% of songs",
-      "median": 39.64,
-      "p95": 47.37,
+      "median": 25.04,
+      "p95": 34.65,
       "rows": 1,
       "plan": "Seq Scan"
     },
     {
       "name": "search_common_word",
       "what": "Search a word in ~40% of songs",
-      "median": 38.67,
-      "p95": 52.49,
+      "median": 24.14,
+      "p95": 25.81,
       "rows": 1,
       "plan": "Seq Scan"
     },
     {
       "name": "search_lyrics",
       "what": "Search three lyric words",
-      "median": 40.41,
-      "p95": 45.08,
+      "median": 25.27,
+      "p95": 27.78,
       "rows": 1,
       "plan": "Seq Scan"
     },
     {
       "name": "filter_keys_tempo",
       "what": "Filter: keys G/D/Em, tempo 60-100",
-      "median": 3.02,
-      "p95": 4.08,
+      "median": 1.91,
+      "p95": 3.34,
       "rows": 1,
       "plan": "Bitmap Heap Scan, Bitmap Index Scan(songs_church_key_idx)"
     },
     {
       "name": "filter_minor",
       "what": "Filter: minor keys",
-      "median": 6.95,
-      "p95": 9.69,
+      "median": 2.81,
+      "p95": 3.25,
       "rows": 1,
       "plan": "Seq Scan"
     },
     {
       "name": "sort_tempo",
       "what": "Sort by tempo",
-      "median": 3.33,
-      "p95": 5.05,
+      "median": 1.75,
+      "p95": 2.39,
       "rows": 1,
       "plan": "Index Scan(songs_church_tempo_idx)"
     },
     {
       "name": "sort_recent",
       "what": "Sort by recently changed",
-      "median": 2.51,
-      "p95": 3.28,
+      "median": 1.54,
+      "p95": 1.84,
       "rows": 1,
       "plan": "Index Scan(songs_church_updated_idx)"
     },
     {
       "name": "facets",
       "what": "Filter choices (keys, artists, ...)",
-      "median": 4.28,
-      "p95": 5.08,
+      "median": 3.12,
+      "p95": 4.27,
       "rows": 1,
       "plan": ""
     },
     {
       "name": "list_default_new",
       "what": "Songs page, first 25 by title (function)",
-      "median": 2.29,
-      "p95": 2.9,
+      "median": 1.87,
+      "p95": 2.64,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "list_deep_page_new",
       "what": "Songs page 40 (function)",
-      "median": 2.68,
-      "p95": 3.62,
+      "median": 2.01,
+      "p95": 2.7,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "search_rare_word_new",
-      "what": "Search a word in ~2% of songs (function)",
-      "median": 16.08,
-      "p95": 20.95,
+      "what": "Search a word in ~2% of songs (best match)",
+      "median": 14.32,
+      "p95": 20.18,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "search_common_word_new",
       "what": "Search a word in ~40% of songs (function)",
-      "median": 15.14,
-      "p95": 20.64,
+      "median": 16.21,
+      "p95": 18.06,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "search_lyrics_new",
       "what": "Search three lyric words (function)",
-      "median": 17.67,
-      "p95": 19.36,
+      "median": 15.67,
+      "p95": 18.29,
       "rows": 3,
       "plan": "Function Scan"
     },
     {
       "name": "filter_keys_tempo_new",
       "what": "Filter: keys G/D/Em, tempo 60-100 (function)",
-      "median": 2.16,
-      "p95": 3.05,
+      "median": 1.54,
+      "p95": 3.12,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "filter_minor_new",
       "what": "Filter: minor keys (function)",
-      "median": 2.39,
-      "p95": 4.18,
+      "median": 2.07,
+      "p95": 3.03,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "sort_tempo_new",
       "what": "Sort by tempo (function)",
-      "median": 1.93,
-      "p95": 3.5,
+      "median": 1.47,
+      "p95": 2.2,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "sort_recent_new",
       "what": "Sort by recently changed (function)",
-      "median": 1.62,
-      "p95": 3.22,
+      "median": 1.58,
+      "p95": 2.49,
       "rows": 25,
       "plan": "Function Scan"
     },
     {
       "name": "facets_new",
       "what": "Filter choices, one pass",
-      "median": 3.32,
-      "p95": 4.02,
+      "median": 2.74,
+      "p95": 3.46,
       "rows": 1,
       "plan": ""
     },
     {
       "name": "home_setlists",
       "what": "Home page: all setlists with counts + purge (old)",
-      "median": 2.77,
-      "p95": 3.91,
+      "median": 2.46,
+      "p95": 3.48,
       "rows": 60,
       "plan": ""
     },
     {
       "name": "home_next_setlist_new",
       "what": "Home page: just the next setlist",
-      "median": 0.93,
-      "p95": 1.99,
+      "median": 0.7,
+      "p95": 1.73,
       "rows": 1,
       "plan": "Seq Scan, Bitmap Heap Scan, Bitmap Index Scan(setlist_items_setlist_id_idx)"
     },
     {
       "name": "song_page_setlists_new",
       "what": "Song page: setlists to add to (names only)",
-      "median": 1.19,
-      "p95": 1.65,
+      "median": 0.84,
+      "p95": 1.08,
       "rows": 60,
       "plan": "Seq Scan"
     },
     {
       "name": "setlist_open",
       "what": "Open a setlist: its songs with their text",
-      "median": 2.1,
-      "p95": 2.8,
+      "median": 1.48,
+      "p95": 2.08,
       "rows": 14,
       "plan": "Bitmap Heap Scan, Bitmap Index Scan(setlist_items_setlist_id_idx), Index Scan(songs_pkey)"
     },
     {
       "name": "setlist_messages",
       "what": "Chat: last 100 messages",
-      "median": 1.77,
-      "p95": 2.28,
+      "median": 1.44,
+      "p95": 1.82,
       "rows": 100,
       "plan": "Seq Scan"
     },
     {
       "name": "delete_song",
       "what": "Delete a song that is in setlists (rolled back)",
-      "median": 1.7,
-      "p95": 2.97,
+      "median": 1.23,
+      "p95": 2.92,
       "rows": 0,
       "plan": ""
     },
     {
       "name": "delete_setlist_item",
       "what": "Remove a song from a setlist (rolled back)",
-      "median": 0.63,
-      "p95": 1.37,
+      "median": 0.44,
+      "p95": 0.92,
       "rows": 0,
       "plan": ""
     }

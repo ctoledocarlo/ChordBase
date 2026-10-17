@@ -1,7 +1,7 @@
 import { getUserId } from "@/lib/church";
 import { createClient } from "@/lib/supabase/server";
 import type { ChordStyle } from "./chords";
-import { lyricSnippet, searchTokens } from "./lyric-search";
+import { lyricSnippet, normalizeText, searchTokens } from "./lyric-search";
 import { PAGE_SIZE, type SongFacets, type SongFilters } from "./song-filters";
 
 export type Song = {
@@ -63,6 +63,7 @@ async function songsPage(o: PageOptions): Promise<{ rows: PageRow[]; total: numb
     p_limit: o.limit,
     p_offset: o.offset,
     p_with_body: q !== "",
+    p_phrase: q ? normalizeText(q) : "",
   });
   if (error) console.error("songs_page failed:", error.message);
   const rows = (data as PageRow[] | null) ?? [];
@@ -94,7 +95,7 @@ function withSnippets(rows: PageRow[], query: string): SongSummary[] {
 /** Songs matching what was typed (title, artist or words), best few first. Call it inside <Suspense> or an action. */
 export async function findSongs(query: string, limit = 8): Promise<SongSummary[]> {
   if (!query.trim()) return [];
-  const { rows } = await songsPage({ q: query, limit, offset: 0 });
+  const { rows } = await songsPage({ q: query, limit, offset: 0, sort: "relevance" });
   return withSnippets(rows, query);
 }
 

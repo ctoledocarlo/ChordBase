@@ -22,6 +22,7 @@ export type SetlistSong = {
   original_key: string;
   default_capo: number;
   tempo: number | null;
+  time_signature?: string;
   body: string;
 };
 
@@ -39,7 +40,7 @@ export type SetlistItem = {
 
 /** Columns to select for an item together with its song. */
 export const ITEM_COLUMNS =
-  "id, song_id, position, settings, body_override, transition_mode, transition_chords, songs(title, artist, original_key, default_capo, tempo, body)";
+  "id, song_id, position, settings, body_override, transition_mode, transition_chords, songs(title, artist, original_key, default_capo, tempo, time_signature, body)";
 
 type ItemRow = {
   id: string;

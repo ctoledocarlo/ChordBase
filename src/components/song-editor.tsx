@@ -393,6 +393,7 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
       <input type="hidden" name="tags" value={info.tags} />
       <input type="hidden" name="body" value={body} />
 
+      <div data-tour="editor-screen">
       {tab === "lyrics" && (
         <LyricsTab
           info={info}
@@ -427,6 +428,7 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
         />
       )}
       {tab === "preview" && <PreviewTab info={info} sections={sections} size={textSize} onMove={moveSection} />}
+      </div>
 
       <Modal
         open={!!importState.choices}
@@ -457,7 +459,7 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
 
       <SidebarPortal>
         {!song && (
-          <section className="space-y-2">
+          <section data-tour="editor-import" className="space-y-2">
             <input
               ref={importInput}
               type="file"
@@ -496,7 +498,7 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
           </section>
         )}
 
-        <nav aria-label="Song editor" className="-mx-1">
+        <nav aria-label="Song editor" data-tour="editor-tabs" className="-mx-1">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -516,7 +518,7 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
         </nav>
 
         <div className="space-y-3">
-          <button type="submit" form="song-form" disabled={pending} className="btn btn-primary w-full">
+          <button data-tour="editor-save" type="submit" form="song-form" disabled={pending} className="btn btn-primary w-full">
             {pending ? "Saving…" : "Save song"}
           </button>
           <div className="grid gap-2">

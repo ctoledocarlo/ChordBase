@@ -65,7 +65,7 @@ export function LyricsTab(p: Props) {
         }}
       />
 
-      <section>
+      <section data-tour="editor-info">
         <button
           type="button"
           onClick={() => p.onInfoOpen(!p.infoOpen)}
@@ -174,7 +174,7 @@ export function LyricsTab(p: Props) {
 
         <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
           <div>
-            <ul className="grid grid-cols-2 gap-3" aria-label="Sections of the song. Drag to reorder.">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Sections of the song. Drag to reorder.">
               {sections.map((s, index) => {
                 const isSelected = s.id === selected?.id;
                 const words = s.lines.map((l) => l.text).join("\n").trim();

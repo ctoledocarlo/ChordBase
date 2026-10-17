@@ -90,6 +90,14 @@ async function main() {
     await new Promise((r) => setTimeout(r, 300));
   }
 
+  // `--serve`: don't measure, just keep the signed-in app running so it can be looked at by hand. Open
+  // http://127.0.0.1:3999 and, in the page, run:
+  //   fetch("http://127.0.0.1:54399/__session").then(r => r.json()).then(s => { document.cookie = s.cookie + "; path=/"; location.reload(); })
+  if (args.serve) {
+    console.log("serving on http://127.0.0.1:3999 (stand-in database on :54399); Ctrl+C to stop");
+    await new Promise(() => {});
+  }
+
   const cookie = stub.sessionCookie();
   const pages = [
     ["home (songs list)", "/"],

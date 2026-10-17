@@ -35,6 +35,7 @@ import { CornerMenu, RoleSelect } from "./screen-menu";
 import { SetlistChat } from "./setlist-chat";
 import { SetlistRail } from "./setlist-rail";
 import { SidebarPortal } from "./sidebar-portal";
+import { Metronome } from "./metronome";
 import { SongSettingsPanel, deriveSong, useSongSections } from "./song-settings";
 import { TransitionPanel } from "./transition-panel";
 import { useScreenRole } from "./use-screen-role";
@@ -74,6 +75,8 @@ export function SetlistPlayer({
   const [saveNote, setSaveNote] = useState<string | null>(null);
   // Editing the chords of the song on screen, for this setlist only.
   const [editChords, setEditChords] = useState(false);
+  // On a phone the setlist panel is a sheet at the bottom of the screen; this is whether it is pulled up.
+  const [railOpen, setRailOpen] = useState(false);
 
   const [name, setName] = useState(setlist.name);
   const [date, setDate] = useState(setlist.service_date ?? "");
@@ -115,6 +118,13 @@ export function SetlistPlayer({
   // The same for each song's own version of its chords.
   const bodyTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const bodyPending = useRef(new Map<string, string | null>());
+  // A tutorial step about the setlist panel pulls the sheet up on a phone.
+  useEffect(() => {
+    const onTour = (e: Event) => setRailOpen(Boolean((e as CustomEvent<boolean>).detail));
+    window.addEventListener("chordbase:tour-rail", onTour);
+    return () => window.removeEventListener("chordbase:tour-rail", onTour);
+  }, []);
+
   // The same for how each song leads into the next.
   const transTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const transPending = useRef(new Map<string, Transition>());
@@ -503,7 +513,7 @@ export function SetlistPlayer({
     <>
       {media && !(editChords && current && !live) && (
       <SidebarPortal>
-        <section>
+        <section data-tour="setlist-role">
           <h2 className="mb-2 text-sm font-medium">This screen</h2>
           <RoleSelect role={role} onChange={changeRole} />
           <p className="mt-1.5 text-sm text-muted">
@@ -511,7 +521,7 @@ export function SetlistPlayer({
           </p>
         </section>
 
-        <section className="border-t border-line pt-5">
+        <section data-tour="setlist-info" className="border-t border-line pt-5">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 className="text-sm font-medium">Setlist</h2>
             <button
@@ -566,7 +576,7 @@ export function SetlistPlayer({
             <div className="space-y-2 border-t border-line pt-5">
               <p className="truncate text-sm font-medium">{current.song.title}</p>
               <p className="text-sm text-muted">Change the chords for this setlist only:</p>
-              <button type="button" className="btn btn-primary w-full" onClick={() => setEditChords(true)}>
+              <button data-tour="setlist-edit-chords" type="button" className="btn btn-primary w-full" onClick={() => setEditChords(true)}>
                 Edit chords
               </button>
               {current.body_override !== null && (
@@ -583,14 +593,18 @@ export function SetlistPlayer({
               The settings below are saved for this setlist only.
               {saveNote && <span role="status"> {saveNote}.</span>}
             </p>
-            <SongSettingsPanel
-              originalKey={current.song.original_key}
-              defaultCapo={current.song.default_capo}
-              settings={current.settings}
-              onChange={(s) => changeSettings(current.id, s)}
-            />
+            <div data-tour="setlist-settings" className="space-y-6">
+              <SongSettingsPanel
+                originalKey={current.song.original_key}
+                defaultCapo={current.song.default_capo}
+                settings={current.settings}
+                onChange={(s) => changeSettings(current.id, s)}
+              />
+            </div>
             {nextItem && (
-              <TransitionPanel from={current} to={nextItem} onChange={(t) => changeTransition(current.id, t)} />
+              <div data-tour="setlist-bridge">
+                <TransitionPanel from={current} to={nextItem} onChange={(t) => changeTransition(current.id, t)} />
+              </div>
             )}
           </>
         )}
@@ -634,7 +648,7 @@ export function SetlistPlayer({
 
       <LiveFrame live={liveView} onExit={() => setLive(false)} hideExit={!media} liveClassName="pt-14 lg:pt-6">
         <div className={`flex flex-col gap-4 lg:flex-row ${liveView ? "h-full" : ""}`}>
-          <div className="min-h-0 min-w-0 flex-1">
+          <div data-tour="setlist-song" className="min-h-0 min-w-0 flex-1 max-lg:pb-14">
             {media && current && editChords && !live ? (
               <>
               {conflict && conflict.id === current.id && (
@@ -667,9 +681,27 @@ export function SetlistPlayer({
           </div>
           <div
             className={`w-full flex-none lg:w-72 ${
-              liveView ? "h-72 lg:h-auto lg:pt-10" : "h-[28rem] lg:h-[calc(100dvh-7.5rem)]"
+              liveView ? "lg:h-auto lg:pt-10" : "lg:h-[calc(100dvh-7.5rem)]"
+            } max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[25] max-lg:rounded-t-2xl max-lg:border max-lg:border-b-0 max-lg:border-line max-lg:bg-background max-lg:px-4 max-lg:shadow-[0_-8px_30px_rgba(0,0,0,0.18)] max-lg:transition-[height] ${
+              railOpen ? "max-lg:h-[min(82dvh,44rem)]" : "max-lg:h-14 max-lg:overflow-hidden"
             }`}
           >
+            <button
+              type="button"
+              onClick={() => setRailOpen((o) => !o)}
+              aria-expanded={railOpen}
+              className="flex h-14 w-full items-center gap-3 text-left lg:hidden"
+            >
+              <span aria-hidden className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line" />
+              <span className="mt-2 text-sm font-semibold">Setlist</span>
+              <span className="mt-2 min-w-0 flex-1 truncate text-sm text-muted">
+                {items.find((i) => i.id === stageId)?.song.title ?? "Nothing on stage"}
+              </span>
+              <span aria-hidden className={`mt-2 text-muted transition-transform ${railOpen ? "rotate-180" : ""}`}>
+                ▲
+              </span>
+            </button>
+            <div className="max-lg:h-[calc(100%-3.5rem)] lg:h-full">
             <SetlistRail
               items={items}
               role={role}
@@ -691,7 +723,17 @@ export function SetlistPlayer({
               status={sync.status}
               roles={sync.roles}
               highlightIds={highlight}
-              reference={current ? <KeyChords item={current} /> : null}
+              reference={
+                current ? (
+                  <>
+                    {/* Keyed by the song so it stops and takes that song's tempo when the song changes. */}
+                    <div data-tour="metronome" className="flex-none border-b border-line">
+                      <Metronome key={current.id} tempo={current.song.tempo} timeSignature={current.song.time_signature} />
+                    </div>
+                    <KeyChords item={current} />
+                  </>
+                ) : null
+              }
               chat={<SetlistChat messages={messages} role={role} screenId={screenId} onSend={say} />}
               keyControl={
                 liveView && current && role !== "viewer" ? (
@@ -699,6 +741,7 @@ export function SetlistPlayer({
                 ) : null
               }
             />
+            </div>
           </div>
         </div>
       </LiveFrame>

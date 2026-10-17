@@ -1,15 +1,18 @@
 "use client";
 
 import { useLayoutEffect, useRef, type HTMLAttributes, type ReactNode } from "react";
+import { usePhone } from "./use-phone";
 
 const MIN_PX = 7;
 const MAX_PX = 30;
+/** On a phone the text never shrinks below this to fit everything in; the song scrolls instead. */
+const PHONE_MIN_PX = 15;
 
 /**
  * Picks the largest text size at which everything fits in the box without
  * scrolling. Children are the columns, laid out side by side.
  */
-function fit(el: HTMLElement, size: number | "fit") {
+function fit(el: HTMLElement, size: number | "fit", minPx: number) {
   if (size !== "fit") {
     el.style.fontSize = `${size}px`;
     el.style.overflow = "auto";
@@ -21,7 +24,7 @@ function fit(el: HTMLElement, size: number | "fit") {
     return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1;
   };
   if (fits(MAX_PX)) return;
-  let lo = MIN_PX;
+  let lo = minPx;
   let hi = MAX_PX;
   while (hi - lo > 0.5) {
     const mid = (lo + hi) / 2;
@@ -47,13 +50,16 @@ export function FitToScreen({
   children: ReactNode;
 } & Omit<HTMLAttributes<HTMLDivElement>, "style" | "className" | "children">) {
   const ref = useRef<HTMLDivElement>(null);
+  // On a phone the parts of the song stack in one column and the text stays readable (the song scrolls if it must).
+  const phone = usePhone();
 
   // No dependency list on purpose: re-fit whenever the content changes.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    fit(el, size);
-    const observer = new ResizeObserver(() => fit(el, size));
+    const minPx = phone ? PHONE_MIN_PX : MIN_PX;
+    fit(el, size, minPx);
+    const observer = new ResizeObserver(() => fit(el, size, minPx));
     observer.observe(el);
     return () => observer.disconnect();
   });
@@ -64,7 +70,7 @@ export function FitToScreen({
       data-fit-area="true"
       className={className}
       // Columns sit side by side, each as wide as its widest line, so no space is wasted between them.
-      style={{ display: "flex", alignItems: "stretch", columnGap: "1.75em", position: "relative" }}
+      style={{ display: "flex", flexDirection: phone ? "column" : "row", alignItems: "stretch", columnGap: "1.75em", position: "relative" }}
       {...rest}
     >
       {children}

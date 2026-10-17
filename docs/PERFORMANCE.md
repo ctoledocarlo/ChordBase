@@ -65,43 +65,43 @@ The "before" column is the old queries on the old tables; "after" is the new que
 
 |  | Before | After | Faster |
 | --- | ---: | ---: | ---: |
-| Songs page, first 25 | 4.73 ms | 2.29 ms | 2.1× |
-| Songs page, page 40 | 4.80 ms | 2.68 ms | 1.8× |
-| Search: a word in 2% of songs | 31.0 ms | 16.1 ms | 1.9× |
-| Search: a word in 40% of songs | 30.9 ms | 15.1 ms | 2.0× |
-| Search: three lyric words | 33.1 ms | 17.7 ms | 1.9× |
-| Filter: keys and tempo | 3.38 ms | 2.16 ms | 1.6× |
-| Filter: minor keys | 4.59 ms | 2.39 ms | 1.9× |
-| Sort by tempo | 3.57 ms | 1.93 ms | 1.8× |
-| Sort by recently changed | 4.12 ms | 1.62 ms | 2.5× |
-| Filter choices (keys, artists…) | 4.19 ms | 3.32 ms | 1.3× |
-| Home page: the next setlist | 4.00 ms | 0.93 ms | 4.3× |
-| Song page: setlists to add to | 4.00 ms | 1.19 ms | 3.4× |
-| Open a setlist | 2.26 ms | 2.10 ms | 1.1× |
-| Chat: last 100 messages | 2.71 ms | 1.77 ms | 1.5× |
-| Delete a song that is in setlists | 2.43 ms | 1.70 ms | 1.4× |
+| Songs page, first 25 | 4.73 ms | 1.87 ms | 2.5× |
+| Songs page, page 40 | 4.80 ms | 2.01 ms | 2.4× |
+| Search: a word in 2% of songs | 31.0 ms | 14.3 ms | 2.2× |
+| Search: a word in 40% of songs | 30.9 ms | 16.2 ms | 1.9× |
+| Search: three lyric words | 33.1 ms | 15.7 ms | 2.1× |
+| Filter: keys and tempo | 3.38 ms | 1.54 ms | 2.2× |
+| Filter: minor keys | 4.59 ms | 2.07 ms | 2.2× |
+| Sort by tempo | 3.57 ms | 1.47 ms | 2.4× |
+| Sort by recently changed | 4.12 ms | 1.58 ms | 2.6× |
+| Filter choices (keys, artists…) | 4.19 ms | 2.74 ms | 1.5× |
+| Home page: the next setlist | 4.00 ms | 0.70 ms | 5.7× |
+| Song page: setlists to add to | 4.00 ms | 0.84 ms | 4.8× |
+| Open a setlist | 2.26 ms | 1.48 ms | 1.5× |
+| Chat: last 100 messages | 2.71 ms | 1.44 ms | 1.9× |
+| Delete a song that is in setlists | 2.43 ms | 1.23 ms | 2.0× |
 
-*1400 songs (7744 kB with indexes before, 9344 kB after), 60 setlists.*
+*1400 songs (7744 kB with indexes before, 9352 kB after), 60 setlists.*
 
 ### 10,000 songs (where it is heading)
 
 |  | Before | After | Faster |
 | --- | ---: | ---: | ---: |
-| Songs page, first 25 | 15.2 ms | 4.53 ms | 3.4× |
-| Songs page, page 40 | 17.1 ms | 5.08 ms | 3.4× |
-| Search: a word in 2% of songs | 182 ms | 20.2 ms | 9.0× |
-| Search: a word in 40% of songs | 178 ms | 91.5 ms | 1.9× |
-| Search: three lyric words | 238 ms | 39.1 ms | 6.1× |
-| Filter: keys and tempo | 12.6 ms | 3.52 ms | 3.6× |
-| Filter: minor keys | 17.3 ms | 8.19 ms | 2.1× |
-| Sort by tempo | 11.6 ms | 4.65 ms | 2.5× |
-| Sort by recently changed | 14.0 ms | 4.88 ms | 2.9× |
-| Filter choices (keys, artists…) | 22.9 ms | 16.6 ms | 1.4× |
-| Home page: the next setlist | 2.81 ms | 0.97 ms | 2.9× |
-| Song page: setlists to add to | 2.81 ms | 1.30 ms | 2.2× |
-| Open a setlist | 2.02 ms | 2.03 ms | 1.0× |
-| Chat: last 100 messages | 1.78 ms | 2.13 ms | 0.8× |
-| Delete a song that is in setlists | 1.66 ms | 2.02 ms | 0.8× |
+| Songs page, first 25 | 15.2 ms | 3.87 ms | 3.9× |
+| Songs page, page 40 | 17.1 ms | 4.49 ms | 3.8× |
+| Search: a word in 2% of songs | 182 ms | 18.9 ms | 9.6× |
+| Search: a word in 40% of songs | 178 ms | 112 ms | 1.6× |
+| Search: three lyric words | 238 ms | 36.4 ms | 6.5× |
+| Filter: keys and tempo | 12.6 ms | 2.33 ms | 5.4× |
+| Filter: minor keys | 17.3 ms | 8.44 ms | 2.1× |
+| Sort by tempo | 11.6 ms | 3.92 ms | 3.0× |
+| Sort by recently changed | 14.0 ms | 3.65 ms | 3.8× |
+| Filter choices (keys, artists…) | 22.9 ms | 16.2 ms | 1.4× |
+| Home page: the next setlist | 2.81 ms | 0.70 ms | 4.0× |
+| Song page: setlists to add to | 2.81 ms | 0.83 ms | 3.4× |
+| Open a setlist | 2.02 ms | 1.49 ms | 1.4× |
+| Chat: last 100 messages | 1.78 ms | 1.38 ms | 1.3× |
+| Delete a song that is in setlists | 1.66 ms | 1.08 ms | 1.5× |
 
 *10000 songs (35 MB with indexes before, 46 MB after), 60 setlists.*
 
@@ -184,7 +184,7 @@ database round trip, which is why it wasn't changed.
 - Searching for words used to read every song in full. Row level security stops Postgres from using an index
   for "contains" searches, so the search now runs in a database function (`songs_page`) that checks the church
   itself and can use new trigram indexes on title, artist and lyrics. It also counts the matches in the same
-  pass rather than a second one. A test (`npm run bench:verify`) checks it returns exactly what the plain
+  pass rather than a second one. Searches are ordered best match first (exact title, title starts with it, title has it, the lyrics have the words together, the artist, then the lyrics with the words closest together), at no measurable cost. A test (`npm run bench:verify`) checks it returns exactly what the plain
   queries do and never another church's songs.
 - Indexes for the orders the song list offers (title, artist, key, tempo, recently changed), and for the
   setlist list. The old index was on `lower(title)`, which the list never used.

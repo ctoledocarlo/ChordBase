@@ -62,7 +62,7 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     body_override: null,
     transition_mode: "auto",
     transition_chords: "",
-    songs: { ...songRow(i, true), default_capo: 0 },
+    songs: { ...songRow(i, true), default_capo: 0, time_signature: "4/4" },
   }));
   const setlistRow = (i) => ({ id: i === 0 ? IDS.setlist : randomUUID(), name: `Sunday ${i}`, service_date: futureDate(i - 10), expires_at: futureDate(20), active_item_id: null, setlist_items: [{ count: 14 }] });
   const setlists = Array.from({ length: 60 }, (_, i) => setlistRow(i));
@@ -88,6 +88,12 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
       res.writeHead(status, { "content-type": "application/json", ...headers });
       res.end(data === undefined ? "" : JSON.stringify(data));
     };
+
+    // For looking at the app by hand: the signed-in cookie, readable from the page being tested.
+    if (url.pathname === "/__session") {
+      res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
+      return res.end(JSON.stringify({ cookie: sessionCookie(), setlist: IDS.setlist, song: IDS.song }));
+    }
 
     if (url.pathname === "/auth/v1/.well-known/jwks.json") {
       // The signing keys are read once per server, not per request.

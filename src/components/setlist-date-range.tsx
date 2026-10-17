@@ -20,17 +20,17 @@ export function SetlistDateRange({ q, from, to }: { q: string; from: string; to:
   }
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-      <label className="flex items-center gap-2">
+    <div data-tour="setlists-dates" className="mt-3 grid grid-cols-2 gap-3 text-sm sm:flex sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2">
+      <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
         <span className="text-muted">From</span>
-        <input type="date" value={from} max={to || undefined} onChange={(e) => go({ from: e.target.value })} className="field field-sm w-auto" />
+        <input type="date" value={from} max={to || undefined} onChange={(e) => go({ from: e.target.value })} className="field field-sm w-full sm:w-auto" />
       </label>
-      <label className="flex items-center gap-2">
+      <label className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
         <span className="text-muted">To</span>
-        <input type="date" value={to} min={from || undefined} onChange={(e) => go({ to: e.target.value })} className="field field-sm w-auto" />
+        <input type="date" value={to} min={from || undefined} onChange={(e) => go({ to: e.target.value })} className="field field-sm w-full sm:w-auto" />
       </label>
       {(from || to) && (
-        <button type="button" onClick={() => go({ from: "", to: "" })} className="text-muted underline hover:text-foreground">
+        <button type="button" onClick={() => go({ from: "", to: "" })} className="col-span-2 text-left text-muted underline hover:text-foreground">
           Clear dates
         </button>
       )}

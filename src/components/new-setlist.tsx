@@ -10,7 +10,7 @@ export function NewSetlist() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
+      <button data-tour="setlists-new" type="button" className="btn btn-primary" onClick={() => setOpen(true)}>
         New setlist
       </button>
       <Modal open={open} title="New setlist" onClose={() => setOpen(false)}>

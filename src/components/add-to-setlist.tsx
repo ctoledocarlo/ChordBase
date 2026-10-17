@@ -58,7 +58,7 @@ export function AddToSetlist({
 
   return (
     <>
-      <button type="button" className="btn w-full" onClick={() => setOpen(true)}>
+      <button data-tour="song-add-setlist" type="button" className="btn w-full" onClick={() => setOpen(true)}>
         Add to setlist
       </button>
       <Modal open={open} title="Add to setlist" onClose={() => setOpen(false)}>

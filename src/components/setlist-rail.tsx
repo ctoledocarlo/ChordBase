@@ -132,7 +132,7 @@ export function SetlistRail({
   const who = ROLES.filter((r) => (roles[r.value] ?? 0) > 0).map((r) => `${roles[r.value]} ${r.label}`);
 
   return (
-    <aside aria-label="Setlist" className="flex h-full min-h-0 flex-col border-line lg:border-l lg:pl-4">
+    <aside aria-label="Setlist" data-tour="setlist-rail" className="flex h-full min-h-0 flex-col border-line lg:border-l lg:pl-4">
       <div className="mb-1.5 flex flex-none items-center gap-2">
         <p
           role="status"
@@ -154,7 +154,7 @@ export function SetlistRail({
           </span>
         </p>
         {media && !live && (
-          <button type="button" className="btn btn-primary flex-none px-2.5 py-0.5 text-[0.8125rem]" onClick={onGoLive} disabled={items.length === 0}>
+          <button data-tour="setlist-golive" type="button" className="btn btn-primary flex-none px-2.5 py-0.5 text-[0.8125rem]" onClick={onGoLive} disabled={items.length === 0}>
             Go live
           </button>
         )}
@@ -163,7 +163,7 @@ export function SetlistRail({
       {keyControl}
 
       {media && (
-        <div className="flex-none border-b border-line pb-1.5">
+        <div data-tour="setlist-add" className="flex-none border-b border-line pb-1.5">
           <input
             type="search"
             value={query}
@@ -202,7 +202,7 @@ export function SetlistRail({
         </div>
       )}
 
-      <div className="flex-none space-y-0.5 border-b border-line py-1.5 text-[0.8125rem]">
+      <div data-tour="setlist-onstage" className="flex-none space-y-0.5 border-b border-line py-1.5 text-[0.8125rem]">
         <p className="flex items-baseline gap-2">
           <span className="w-12 flex-none text-[0.625rem] font-medium uppercase tracking-wide text-muted">On stage</span>
           {onStage ? (
@@ -264,7 +264,7 @@ export function SetlistRail({
 
       {reference}
 
-      <div className="min-h-0 flex-[3] overflow-y-auto py-2">
+      <div data-tour="setlist-list" className="min-h-0 flex-[3] overflow-y-auto py-2">
         <p className="mb-1 flex items-center justify-between gap-2 text-[0.6875rem] font-medium uppercase tracking-wide text-muted">
           <span>
             Setlist · {items.length} {items.length === 1 ? "song" : "songs"}

@@ -18,6 +18,7 @@ export function SearchForm({
   disabled = false,
   keep = [],
   className = "mt-5",
+  tourId,
 }: {
   /** The page to search, e.g. "/". */
   action: string;
@@ -28,6 +29,8 @@ export function SearchForm({
   /** Other query values to carry along when searching (such as the filters), as [name, value]. */
   keep?: [string, string][];
   className?: string;
+  /** Marks the box for the tutorials. */
+  tourId?: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState(q);
@@ -63,6 +66,7 @@ export function SearchForm({
   return (
     <form
       role="search"
+      data-tour={tourId}
       className={className}
       aria-busy={pending}
       onSubmit={(e) => {

@@ -55,7 +55,7 @@ export function SetlistChat({
   }
 
   return (
-    <section aria-label="Session chat" className={`flex flex-col border-t border-line pt-2 ${open ? "min-h-[9rem] flex-[2]" : "flex-none"}`}>
+    <section aria-label="Session chat" data-tour="setlist-chat" className={`flex flex-col border-t border-line pt-2 ${open ? "min-h-[9rem] flex-[2]" : "flex-none"}`}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

@@ -40,6 +40,7 @@ async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">
       </div>
 
       <SearchForm
+        tourId="setlists-search"
         action="/setlists"
         q={q}
         keep={[...(from ? [["from", from]] : []), ...(to ? [["to", to]] : [])] as [string, string][]}
@@ -51,10 +52,10 @@ async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">
       {total === 0 ? (
         <p className="mt-10 text-muted">{narrowed ? "Nothing matches that. Try a different name or date." : "No setlists yet. Create your first one."}</p>
       ) : (
-        <>
+        <div data-tour="setlists-list">
           <Group title="Upcoming" rows={upcoming} />
           <Group title="Past" rows={past} />
-        </>
+        </div>
       )}
     </div>
   );
@@ -69,7 +70,13 @@ function Group({ title, rows }: { title: string; rows: SetlistSummary[] }) {
         {rows.map((s) => (
           <li key={s.id} className="flex items-center gap-1 hover:bg-hover">
             <Link href={`/setlists/${s.id}`} className="flex min-w-0 flex-1 items-baseline gap-4 px-1 py-3.5">
-              <span className="min-w-0 flex-1 truncate font-medium">{s.name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{s.name}</span>
+                {/* The date has no room beside the name on a phone, so it goes underneath. */}
+                <span className="block truncate text-xs text-muted sm:hidden">
+                  {s.service_date ? formatDay(s.service_date) : "No date"} · expires {formatDay(s.expires_at)}
+                </span>
+              </span>
               <span className="hidden text-sm text-muted sm:inline">{s.service_date ? formatDay(s.service_date) : "No date"}</span>
               <span className="hidden text-xs text-muted md:inline">Expires {formatDay(s.expires_at)}</span>
               <span className="w-20 text-right text-sm text-muted">

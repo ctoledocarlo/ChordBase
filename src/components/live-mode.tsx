@@ -47,6 +47,7 @@ export function LiveFrame({
   onExit,
   liveClassName = "",
   hideExit = false,
+  tour,
   children,
 }: {
   live: boolean;
@@ -55,10 +56,12 @@ export function LiveFrame({
   liveClassName?: string;
   /** For screens that are always live (Stage and Viewer), so there is nothing to exit to. */
   hideExit?: boolean;
+  /** Marks the song area for the tutorials. */
+  tour?: string;
   children: ReactNode;
 }) {
   return (
-    <div className={live ? `fixed inset-0 z-50 bg-background p-6 ${liveClassName}` : undefined}>
+    <div data-tour={tour} className={live ? `fixed inset-0 z-50 bg-background p-3 sm:p-6 ${liveClassName}` : undefined}>
       {live && !hideExit && (
         <button type="button" onClick={onExit} className="btn fixed right-4 top-4 z-10" aria-label="Exit live mode">
           <CloseIcon /> Exit

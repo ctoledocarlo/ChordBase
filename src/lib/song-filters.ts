@@ -1,6 +1,8 @@
 export const PAGE_SIZE = 25;
 
 export const SORTS = [
+  // Only offered (and only used) while searching: the songs closest to what was typed come first.
+  { value: "relevance", label: "Best match" },
   { value: "title", label: "Title (A–Z)" },
   { value: "artist", label: "Artist (A–Z)" },
   { value: "key", label: "Key" },
@@ -24,6 +26,9 @@ export type SongFilters = {
   page: number;
 };
 
+/** How the list is ordered when nothing has been chosen: best match while searching, otherwise by title. */
+export const defaultSort = (q: string): SongSort => (q.trim() !== "" ? "relevance" : "title");
+
 type Raw = Record<string, string | string[] | undefined>;
 
 const all = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v === undefined ? [] : [v]);
@@ -41,8 +46,9 @@ export function parseSongFilters(raw: Raw): SongFilters {
   if (tempoMin !== null && tempoMax !== null && tempoMin > tempoMax) [tempoMin, tempoMax] = [tempoMax, tempoMin];
   const sort = first(raw.sort);
   const mode = first(raw.mode);
+  const q = first(raw.q).slice(0, 100);
   return {
-    q: first(raw.q).slice(0, 100),
+    q,
     keys: [...new Set(all(raw.key).map((k) => k.trim()).filter((k) => k !== "" && k.length <= 12))].slice(0, 30),
     artist: first(raw.artist).slice(0, 200),
     mode: mode === "major" || mode === "minor" ? mode : "",
@@ -50,7 +56,8 @@ export function parseSongFilters(raw: Raw): SongFilters {
     tempoMax,
     timeSig: /^\d{1,2}\/\d{1,2}$/.test(first(raw.ts)) ? first(raw.ts) : "",
     capo: intIn(first(raw.capo), 0, 12),
-    sort: SORTS.some((s) => s.value === sort) ? (sort as SongSort) : "title",
+    // "Best match" means nothing without a search, so it falls back to title.
+    sort: SORTS.some((s) => s.value === sort) && !(sort === "relevance" && q === "") ? (sort as SongSort) : defaultSort(q),
     page: intIn(first(raw.page), 1, 100000) ?? 1,
   };
 }
@@ -66,7 +73,7 @@ export function filtersToParams(f: SongFilters, page = f.page): URLSearchParams 
   if (f.tempoMax !== null) p.set("tempo_max", String(f.tempoMax));
   if (f.timeSig) p.set("ts", f.timeSig);
   if (f.capo !== null) p.set("capo", String(f.capo));
-  if (f.sort !== "title") p.set("sort", f.sort);
+  if (f.sort !== defaultSort(f.q)) p.set("sort", f.sort);
   if (page > 1) p.set("page", String(page));
   return p;
 }

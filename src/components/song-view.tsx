@@ -33,18 +33,20 @@ export function SongView({ title, tempo, originalKey, defaultCapo, body, editHre
       <SidebarPortal>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-5">
           <div className="flex gap-2">
-            <Link href={editHref} className="btn btn-primary">
+            <Link data-tour="song-edit" href={editHref} className="btn btn-primary">
               Edit song
             </Link>
-            <button type="button" className="btn" onClick={() => setLive(true)}>
+            <button data-tour="song-live" type="button" className="btn" onClick={() => setLive(true)}>
               Live
             </button>
           </div>
         </div>
-        <SongSettingsPanel originalKey={originalKey} defaultCapo={defaultCapo} settings={settings} onChange={setSettings} />
+        <div data-tour="song-settings" className="space-y-6">
+          <SongSettingsPanel originalKey={originalKey} defaultCapo={defaultCapo} settings={settings} onChange={setSettings} />
+        </div>
         {actions && <div className="border-t border-line pt-5">{actions}</div>}
       </SidebarPortal>
-      <LiveFrame live={live} onExit={() => setLive(false)} liveClassName="pr-28">
+      <LiveFrame tour="song-screen" live={live} onExit={() => setLive(false)} liveClassName="pr-28">
         <PreviewTab
           fill={live}
           info={{ title, key: keyLabel, tempo: tempo ? String(tempo) : "" }}

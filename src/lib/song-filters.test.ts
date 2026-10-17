@@ -29,4 +29,19 @@ describe("song filters in the URL", () => {
     expect(pageList(8, 20)).toEqual([1, "gap", 7, 8, 9, "gap", 20]);
     expect(pageList(2, 20)).toEqual([1, 2, 3, "gap", 20]);
   });
+
+  it("orders a search by best match unless another order was chosen", () => {
+    expect(parseSongFilters({ q: "grace" }).sort).toBe("relevance");
+    expect(parseSongFilters({}).sort).toBe("title");
+    expect(parseSongFilters({ q: "grace", sort: "title" }).sort).toBe("title");
+    expect(parseSongFilters({ q: "grace", sort: "tempo" }).sort).toBe("tempo");
+    // Best match means nothing without a search.
+    expect(parseSongFilters({ sort: "relevance" }).sort).toBe("title");
+  });
+
+  it("only writes the order into the address when it isn't the usual one", () => {
+    expect(filtersToParams(parseSongFilters({ q: "grace" })).toString()).toBe("q=grace");
+    expect(filtersToParams(parseSongFilters({ q: "grace", sort: "title" })).toString()).toBe("q=grace&sort=title");
+    expect(filtersToParams(parseSongFilters({ sort: "tempo" })).toString()).toBe("sort=tempo");
+  });
 });

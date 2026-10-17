@@ -57,6 +57,36 @@ for (const [name, args, where, order, offset = 0] of cases) {
   check(name, sameIds && sameTotal, `${fn.length} rows, ${total} in all`);
 }
 
+// "Best match" puts the songs closest to what was typed first: the title as typed, then titles that start
+// with it, then titles with it inside, then lyrics with the words together, then the artist, then lyrics
+// with the words near each other, then far apart.
+await env.signOut();
+const church = "00000000-0000-4000-8000-000000000001";
+const far = `zzquux ${"filler ".repeat(40)}zzfoo`;
+await db.exec(`
+  insert into public.songs (church_id, title, artist, original_key, body) values
+    ('${church}', 'Zzquux Zzfoo', '', 'G', 'a'),
+    ('${church}', 'Zzquux Zzfoo Anthem', '', 'G', 'a'),
+    ('${church}', 'The Zzquux Zzfoo Song', '', 'G', 'a'),
+    ('${church}', 'Plain D', '', 'G', 'one two [G]zzquux zzfoo three four'),
+    ('${church}', 'Plain E', 'Zzquux Zzfoo Band', 'G', 'a'),
+    ('${church}', 'Plain F', '', 'G', 'zzquux and then zzfoo later'),
+    ('${church}', 'Plain G', '', 'G', '${far}');
+`);
+await env.signIn();
+const ranked = (
+  await db.query(
+    "select title from public.songs_page(p_q => 'zzquux zzfoo', p_tokens => array['zzquux','zzfoo'], p_phrase => 'zzquux zzfoo', p_sort => 'relevance')",
+  )
+).rows.map((r) => r.title);
+check(
+  "best match order",
+  JSON.stringify(ranked) === JSON.stringify(["Zzquux Zzfoo", "Zzquux Zzfoo Anthem", "The Zzquux Zzfoo Song", "Plain D", "Plain E", "Plain F", "Plain G"]),
+  ranked.join(" > "),
+);
+const alphabetical = (await db.query("select title from public.songs_page(p_q => 'zzquux zzfoo', p_tokens => array['zzquux','zzfoo'])")).rows.map((r) => r.title);
+check("title order is still available while searching", JSON.stringify(alphabetical) === JSON.stringify(["Plain D", "Plain E", "Plain F", "Plain G", "The Zzquux Zzfoo Song", "Zzquux Zzfoo", "Zzquux Zzfoo Anthem"]), alphabetical.join(" > "));
+
 // Characters that mean something in a search or in SQL are taken as plain text.
 for (const q of ["100%", "a_b", "it's", "back\\slash", "x'; drop table public.songs; --", "\u0001s.id", "{a}"]) {
   try {

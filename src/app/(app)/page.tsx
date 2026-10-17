@@ -48,6 +48,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
 
       {welcome && (
         <Link
+          data-tour="songs-banner"
           href={nextSetlist ? `/setlists/${nextSetlist.id}` : "/setlists"}
           className="group mb-6 flex items-center gap-3 rounded-lg border border-line bg-gradient-to-r from-accent/10 to-transparent px-4 py-2.5 text-sm hover:border-accent"
         >
@@ -74,7 +75,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
           <h1 className="text-2xl font-semibold tracking-tight">Songs</h1>
           <p className="mt-1 text-sm text-muted">{summary}</p>
         </div>
-        <div className="flex flex-none gap-2">
+        <div data-tour="songs-buttons" className="flex flex-none gap-2">
           <Link href="/songs/import" className="btn">
             Import
           </Link>
@@ -84,14 +85,14 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
         </div>
       </div>
 
-      <SearchForm action="/" q={filters.q} keep={keep} label="Search songs" placeholder="Search by title, artist or lyrics" />
+      <SearchForm tourId="songs-search" action="/" q={filters.q} keep={keep} label="Search songs" placeholder="Search by title, artist or lyrics" />
 
       {songs.length === 0 ? (
         <p className="mt-10 text-muted">
           {narrowed ? "Nothing matches that. Try clearing a filter." : "No songs yet. Add your first one."}
         </p>
       ) : (
-        <ul className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line">
+        <ul data-tour="songs-list" className="mt-6 divide-y divide-line overflow-hidden rounded-xl border border-line">
           {songs.map((s) => (
             <li key={s.id}>
               <Link href={`/songs/${s.id}`} className="group flex items-center gap-4 px-4 py-3 hover:bg-hover">
@@ -121,7 +122,7 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
 function Pagination({ filters, page, pages }: { filters: SongFilters; page: number; pages: number }) {
   const cell = "btn min-w-9 px-2";
   return (
-    <nav aria-label="Pages" className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
+    <nav aria-label="Pages" data-tour="songs-pages" className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
       {page > 1 ? (
         <Link href={href(filters, page - 1)} className={cell} rel="prev">
           Previous

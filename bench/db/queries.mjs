@@ -34,9 +34,9 @@ export function queries({ ids, words, term, common }) {
     // The same lists and searches through the songs_page function (needs the 20261025 and 20261026 migrations).
     { name: "list_default_new", what: "Songs page, first 25 by title (function)", sql: "select * from public.songs_page()" },
     { name: "list_deep_page_new", what: "Songs page 40 (function)", sql: "select * from public.songs_page(p_offset => 975)" },
-    { name: "search_rare_word_new", what: "Search a word in ~2% of songs (function)", sql: `select * from public.songs_page(p_q => '${t}', p_tokens => array['${t}'], p_with_body => true)` },
-    { name: "search_common_word_new", what: "Search a word in ~40% of songs (function)", sql: `select * from public.songs_page(p_q => '${c}', p_tokens => array['${c}'], p_with_body => true)` },
-    { name: "search_lyrics_new", what: "Search three lyric words (function)", sql: `select * from public.songs_page(p_q => '${phrase}', p_tokens => array['${words.a}','${words.b}','${words.c}'], p_with_body => true)` },
+    { name: "search_rare_word_new", what: "Search a word in ~2% of songs (best match)", sql: `select * from public.songs_page(p_q => '${t}', p_tokens => array['${t}'], p_with_body => true, p_sort => 'relevance', p_phrase => '${t}')` },
+    { name: "search_common_word_new", what: "Search a word in ~40% of songs (function)", sql: `select * from public.songs_page(p_q => '${c}', p_tokens => array['${c}'], p_with_body => true, p_sort => 'relevance', p_phrase => '${c}')` },
+    { name: "search_lyrics_new", what: "Search three lyric words (function)", sql: `select * from public.songs_page(p_q => '${phrase}', p_tokens => array['${words.a}','${words.b}','${words.c}'], p_with_body => true, p_sort => 'relevance', p_phrase => '${phrase}')` },
     { name: "filter_keys_tempo_new", what: "Filter: keys G/D/Em, tempo 60-100 (function)", sql: "select * from public.songs_page(p_keys => array['G','D','Em'], p_tempo_min => 60, p_tempo_max => 100)" },
     { name: "filter_minor_new", what: "Filter: minor keys (function)", sql: "select * from public.songs_page(p_mode => 'minor')" },
     { name: "sort_tempo_new", what: "Sort by tempo (function)", sql: "select * from public.songs_page(p_sort => 'tempo')" },

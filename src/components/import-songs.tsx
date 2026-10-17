@@ -211,11 +211,12 @@ export function ImportSongs({ existing, onImport }: Props) {
         }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
+        data-tour="import-drop"
         className={`mt-6 flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-10 text-center ${
           dragging ? "border-accent bg-hover" : "border-line"
         }`}
       >
-        <p className="text-sm text-muted">Drop files or folders here</p>
+        <p className="text-sm text-muted max-sm:hidden">Drop files or folders here</p>
         <div className="flex flex-wrap justify-center gap-2">
           <button type="button" className="btn btn-primary" disabled={busy} onClick={() => filePicker.current?.click()}>
             Choose files
@@ -260,7 +261,7 @@ export function ImportSongs({ existing, onImport }: Props) {
 
       {rows.length > 0 && (
         <section className="mt-8" aria-label="Songs found">
-          <div className="sticky top-14 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-background py-3">
+          <div data-tour="import-toolbar" className="sticky top-14 z-10 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-background py-3">
             <h2 className="text-sm font-medium">
               {rows.length} {rows.length === 1 ? "song" : "songs"} found
               <span className="ml-2 font-normal text-muted">{chosen.length} selected</span>
@@ -305,7 +306,7 @@ export function ImportSongs({ existing, onImport }: Props) {
                 : `Import ${chosen.length} ${chosen.length === 1 ? "song" : "songs"}`}
             </button>
           </div>
-          <ul className="divide-y divide-line border-b border-line">
+          <ul data-tour="import-list" className="divide-y divide-line border-b border-line">
             {rows.map((row) => {
               const version = row.song.versions[row.version];
               const key = row.key ?? version.key;
