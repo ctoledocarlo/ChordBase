@@ -9,7 +9,7 @@
  * button, or the page has no such thing right now) the step simply shows in the middle instead.
  */
 
-export type PageKey = "songs" | "song" | "setlists" | "setlist" | "editor" | "import";
+export type PageKey = "songs" | "song" | "setlists" | "setlist" | "editor" | "import" | "practice";
 
 export type TutorialStep = {
   /** The data-tour value of the element to point at. */
@@ -42,6 +42,7 @@ export const PAGE_NAMES: Record<PageKey, string> = {
   setlist: "a setlist",
   editor: "the song editor",
   import: "the Import page",
+  practice: "the Practice page",
 };
 
 /** Which page the address is: used to offer the right tutorials. Null where there are none. */
@@ -52,6 +53,7 @@ export function pageKeyFor(pathname: string): PageKey | null {
   if (/^\/songs\/[^/]+$/.test(pathname)) return "song";
   if (pathname === "/setlists") return "setlists";
   if (/^\/setlists\/[^/]+$/.test(pathname)) return "setlist";
+  if (pathname === "/practice" || pathname.startsWith("/practice/")) return "practice";
   return null;
 }
 
@@ -109,6 +111,39 @@ const SITE: Tutorial = {
 };
 
 const PAGES: Tutorial[] = [
+  {
+    id: "page-practice",
+    kind: "page",
+    title: "How Practice works",
+    summary: "Lessons, keyboards and tools for learning the keys",
+    pages: ["practice"],
+    steps: [
+      {
+        target: "practice-home",
+        title: "Learn the piano keys",
+        body: "Practice teaches the keys from the very first one: where the notes are, the finger numbers, scales, chords and playing in church. Start with lesson 1, or press Continue to pick up where you left off.",
+        optional: true,
+      },
+      {
+        target: "practice-lessons",
+        sidebar: true,
+        title: "The lessons",
+        body: "Every lesson is listed here, with a tick on the ones you have finished. The tools underneath (scale finder, chord finder, circle of fifths, quizzes and a glossary) are for looking things up whenever you need them.",
+      },
+      {
+        target: "practice-lesson",
+        title: "Press the keys",
+        body: "Every lesson has keyboards you can press to hear the notes. Coloured keys show a scale or chord, and the numbers on them are the fingers to use (1 is the thumb). Each keyboard has a Sound switch if you want quiet.",
+        optional: true,
+      },
+      {
+        target: "practice-done",
+        title: "Mark it done",
+        body: "Tick “Mark as done” at the end of a lesson. The ticks are remembered on this device, so you can see your progress in the sidebar.",
+        optional: true,
+      },
+    ],
+  },
   {
     id: "page-songs",
     kind: "page",

@@ -166,7 +166,7 @@ function PageOptionsBar({ onOpen }: { onOpen: () => void }) {
   return (
     <div className="border-b border-line px-3 py-1.5 sm:px-4 lg:hidden">
       <button type="button" onClick={onOpen} className="btn">
-        <MenuIcon /> Page options
+        <MenuIcon /> {pathname.startsWith("/practice") ? "Lessons" : "Page options"}
       </button>
     </div>
   );
@@ -177,6 +177,7 @@ function MainNav() {
   const items = [
     { href: "/setlists", label: "Setlists", soon: false, active: pathname.startsWith("/setlists") },
     { href: "/", label: "Songs", soon: false, active: pathname === "/" || pathname.startsWith("/songs") },
+    { href: "/practice", label: "Practice", soon: false, active: pathname.startsWith("/practice") },
   ];
   return (
     <nav aria-label="Main" data-tour="nav" className="flex items-stretch gap-4 text-sm sm:gap-5">
@@ -207,6 +208,7 @@ function MainNav() {
 function backFallback(pathname: string): string {
   const edit = pathname.match(/^\/songs\/([^/]+)\/edit$/);
   if (edit) return `/songs/${edit[1]}`;
+  if (pathname.startsWith("/practice/")) return "/practice";
   return pathname.startsWith("/setlists/") ? "/setlists" : "/";
 }
 
@@ -226,5 +228,10 @@ function PageTopBack() {
 /** Only pages that put something in the sidebar get one: the song pages and the editor. */
 function SidebarGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  return pathname === "/" || (pathname.startsWith("/songs/") && pathname !== "/songs/import") || pathname.startsWith("/setlists/") ? <>{children}</> : null;
+  return pathname === "/" ||
+    (pathname.startsWith("/songs/") && pathname !== "/songs/import") ||
+    pathname.startsWith("/setlists/") ||
+    pathname.startsWith("/practice") ? (
+    <>{children}</>
+  ) : null;
 }

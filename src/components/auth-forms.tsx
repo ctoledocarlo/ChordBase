@@ -16,11 +16,14 @@ function Field({
   name,
   type = "text",
   autoComplete,
+  defaultValue,
 }: {
   label: string;
   name: string;
   type?: string;
   autoComplete?: string;
+  /** What the box holds when it is (re)drawn: React empties the form after each attempt, so the page puts the email back. */
+  defaultValue?: string;
 }) {
   return (
     <label className="block">
@@ -29,6 +32,7 @@ function Field({
         name={name}
         type={type}
         autoComplete={autoComplete}
+        defaultValue={defaultValue}
         required
         className="field"
       />
@@ -77,7 +81,7 @@ export function LoginForm() {
   const [state, action, pending] = useActionState(signIn, initial);
   return (
     <Form action={action} state={state} pending={pending} submitLabel="Log in">
-      <Field label="Email" name="email" type="email" autoComplete="email" />
+      <Field label="Email" name="email" type="email" autoComplete="email" defaultValue={state.email} />
       <Field
         label="Password"
         name="password"
@@ -105,7 +109,7 @@ export function ForgotPasswordForm() {
       pending={pending}
       submitLabel="Send reset link"
     >
-      <Field label="Email" name="email" type="email" autoComplete="email" />
+      <Field label="Email" name="email" type="email" autoComplete="email" defaultValue={state.email} />
       <p className="text-sm">
         <Link href="/login" className="underline">
           Back to log in

@@ -51,6 +51,8 @@ import { newScreenId, useSetlistSync } from "./use-setlist-sync";
 const SAVE_DELAY_MS = 500;
 /** How long a removed song can be brought back with Undo before it is really deleted. */
 const UNDO_MS = 6000;
+/** The height of the setlist sheet on a phone when it is pulled down to just its bar, in pixels. */
+const SHEET_PEEK = 56;
 
 /** The list with `item` back at `index` (or the end, if the list got shorter). */
 function insertAt(list: SetlistItem[], item: SetlistItem, index: number): SetlistItem[] {
@@ -92,6 +94,10 @@ export function SetlistPlayer({
   const [editChords, setEditChords] = useState(false);
   // On a phone the setlist panel is a sheet at the bottom of the screen; this is whether it is pulled up.
   const [railOpen, setRailOpen] = useState(false);
+  // While a finger is dragging the sheet: its height right now (null when it isn't being dragged).
+  const [sheetDrag, setSheetDrag] = useState<number | null>(null);
+  const sheetGesture = useRef<{ startY: number; startHeight: number; startTime: number; moved: boolean } | null>(null);
+  const sheet = useRef<HTMLDivElement>(null);
   // Display choices for this device on Stage and Viewer screens.
   const [night, setNight] = useStoredFlag("chordbase.night", false);
   const [autoHide, setAutoHide] = useStoredFlag("chordbase.autoHide", false);
@@ -229,6 +235,35 @@ export function SetlistPlayer({
       for (const [id, body] of bp) void saveItemBody(id, body, screenId);
     };
   }, [screenId, setlist.id]);
+
+  /** The setlist sheet on a phone follows a finger dragging its top bar, and settles open or closed where the swipe was heading. */
+  function sheetDown(e: React.PointerEvent<HTMLButtonElement>) {
+    const box = sheet.current;
+    if (!box) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    sheetGesture.current = { startY: e.clientY, startHeight: box.getBoundingClientRect().height, startTime: e.timeStamp, moved: false };
+  }
+
+  function sheetMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const g = sheetGesture.current;
+    if (!g) return;
+    const dy = e.clientY - g.startY;
+    if (!g.moved && Math.abs(dy) < 6) return;
+    g.moved = true;
+    const tallest = Math.min(window.innerHeight * 0.82, 704);
+    setSheetDrag(Math.min(tallest, Math.max(SHEET_PEEK, g.startHeight - dy)));
+  }
+
+  function sheetUp(e: React.PointerEvent<HTMLButtonElement>) {
+    const g = sheetGesture.current;
+    sheetGesture.current = null;
+    setSheetDrag(null);
+    if (!g?.moved) return;
+    const dy = e.clientY - g.startY;
+    const flick = Math.abs(dy) / Math.max(1, e.timeStamp - g.startTime) > 0.4;
+    // A swipe up opens it, a swipe down closes it; a short slow drag leaves it as it was.
+    if (flick || Math.abs(dy) > 40) setRailOpen(dy < 0);
+  }
 
   /** Saves finished: one "Saved" toast however many changes went through, or the error. */
   function afterSave(error?: string) {
@@ -770,17 +805,29 @@ export function SetlistPlayer({
             )}
           </div>
           <div
+            ref={sheet}
+            style={sheetDrag !== null ? ({ "--sheet-h": `${sheetDrag}px` } as React.CSSProperties) : undefined}
             className={`w-full flex-none lg:w-72 ${
               liveView ? "lg:h-auto lg:pt-10" : "lg:h-[calc(100dvh-7.5rem)]"
             } max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[25] max-lg:rounded-t-2xl max-lg:border max-lg:border-b-0 max-lg:border-line max-lg:bg-background max-lg:px-4 max-lg:shadow-[0_-8px_30px_rgba(0,0,0,0.18)] max-lg:transition-[height,transform,opacity] ${
               railOpen ? "max-lg:h-[min(82dvh,44rem)]" : "max-lg:h-14 max-lg:overflow-hidden"
-            } ${hideControls ? "lg:hidden max-lg:pointer-events-none max-lg:translate-y-full max-lg:opacity-0" : ""}`}
+            } ${hideControls ? "lg:hidden max-lg:pointer-events-none max-lg:translate-y-full max-lg:opacity-0" : ""} ${
+              sheetDrag !== null ? "max-lg:!h-[var(--sheet-h)] max-lg:!transition-none" : ""
+            }`}
           >
+            {/* Swipe this bar up to open the setlist and down to close it. Pressing Enter or Space on it works too, for keyboards and screen readers. */}
             <button
               type="button"
-              onClick={() => setRailOpen((o) => !o)}
+              onClick={(e) => {
+                if (e.detail === 0) setRailOpen((o) => !o);
+              }}
+              onPointerDown={sheetDown}
+              onPointerMove={sheetMove}
+              onPointerUp={sheetUp}
+              onPointerCancel={sheetUp}
               aria-expanded={railOpen}
-              className="flex h-14 w-full items-center gap-3 text-left lg:hidden"
+              aria-label={`Setlist, ${railOpen ? "swipe down to close" : "swipe up to open"}`}
+              className="flex h-14 w-full touch-none select-none items-center gap-3 text-left lg:hidden"
             >
               <span aria-hidden className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line" />
               <span className="mt-2 text-sm font-semibold">Setlist</span>

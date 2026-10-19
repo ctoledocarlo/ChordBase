@@ -25,6 +25,7 @@ const PAGE_LINKS: Record<PageKey, { href: string; label: string }> = {
   setlist: { href: "/setlists", label: "Open a setlist" },
   editor: { href: "/songs/new", label: "Open the editor" },
   import: { href: "/songs/import", label: "Go to Import" },
+  practice: { href: "/practice", label: "Go to Practice" },
 };
 
 /**
