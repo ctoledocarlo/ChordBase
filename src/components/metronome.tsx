@@ -159,7 +159,7 @@ export function Metronome({ tempo, timeSignature }: { tempo: number | null; time
             <span
               key={i}
               className={`h-3.5 min-w-0 max-w-5 flex-1 rounded-full transition-[background-color,transform] duration-75 ${
-                on && beat === i ? `${i === 0 ? "bg-[#ea580c]" : "bg-[#2563eb]"} scale-110` : "bg-line"
+                on && beat === i ? `${i === 0 ? "bg-[#ea580c]" : "bg-[#2563eb]"} scale-110` : "bg-muted/30"
               }`}
             />
           ))}

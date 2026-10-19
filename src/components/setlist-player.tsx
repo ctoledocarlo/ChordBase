@@ -37,12 +37,27 @@ import { SetlistRail } from "./setlist-rail";
 import { SidebarPortal } from "./sidebar-portal";
 import { Metronome } from "./metronome";
 import { SongSettingsPanel, deriveSong, useSongSections } from "./song-settings";
+import { SCREEN_HEIGHT } from "./song-editor-shared";
+import { SongToolbar } from "./song-toolbar";
+import { StageStrip } from "./stage-strip";
+import { useToast } from "./toast";
 import { TransitionPanel } from "./transition-panel";
+import { useIdle } from "./use-idle";
+import { useStoredFlag } from "./use-stored-flag";
 import { useScreenRole } from "./use-screen-role";
 import { newScreenId, useSetlistSync } from "./use-setlist-sync";
 
 /** Wait this long after the last change before saving, so dragging through sizes isn't a save each. */
 const SAVE_DELAY_MS = 500;
+/** How long a removed song can be brought back with Undo before it is really deleted. */
+const UNDO_MS = 6000;
+
+/** The list with `item` back at `index` (or the end, if the list got shorter). */
+function insertAt(list: SetlistItem[], item: SetlistItem, index: number): SetlistItem[] {
+  const copy = [...list];
+  copy.splice(Math.min(index, copy.length), 0, item);
+  return copy;
+}
 
 /**
  * A setlist: the song on screen, the whole list on the right, and the settings for the
@@ -77,6 +92,9 @@ export function SetlistPlayer({
   const [editChords, setEditChords] = useState(false);
   // On a phone the setlist panel is a sheet at the bottom of the screen; this is whether it is pulled up.
   const [railOpen, setRailOpen] = useState(false);
+  // Display choices for this device on Stage and Viewer screens.
+  const [night, setNight] = useStoredFlag("chordbase.night", false);
+  const [autoHide, setAutoHide] = useStoredFlag("chordbase.autoHide", false);
 
   const [name, setName] = useState(setlist.name);
   const [date, setDate] = useState(setlist.service_date ?? "");
@@ -90,13 +108,16 @@ export function SetlistPlayer({
 
   // Keeping in step with other screens showing this setlist.
   const [screenId] = useState(newScreenId);
-  const [notices, setNotices] = useState<{ id: number; text: string }[]>([]);
   const [highlight, setHighlight] = useState<ReadonlySet<string>>(new Set());
   // Chords changed on another screen while they were being edited here.
   const [conflict, setConflict] = useState<SetlistItem | null>(null);
   const [editorKey, setEditorKey] = useState(0);
   const structuralRev = useRef(0);
-  const noticeId = useRef(0);
+  const toast = useToast();
+  // Songs taken out of the list a few seconds ago. They are still on the server, so Undo can put them back where they were.
+  const removing = useRef(
+    new Map<string, { timer: ReturnType<typeof setTimeout>; item: SetlistItem; index: number; wasStage: boolean; wasCurrent: boolean }>(),
+  );
   const noticeTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const dirty = name !== saved.name || date !== saved.date || keep !== "";
@@ -111,6 +132,9 @@ export function SetlistPlayer({
   const nextItem = current ? (items[items.findIndex((i) => i.id === current.id) + 1] ?? null) : null;
   // Stage and Viewer screens are always full screen.
   const liveView = live || !media;
+  // Stage and Viewer screens hide their controls after a few quiet seconds so the song has the whole screen.
+  const idle = useIdle(5000, liveView && !media && autoHide);
+  const hideControls = idle && !railOpen;
 
   // Settings waiting to be saved, by item. Saved together after a short pause, and on leaving.
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -162,7 +186,7 @@ export function SetlistPlayer({
     pending.current.delete(itemId);
     timers.current.delete(itemId);
     const res = await tracked(itemId, () => saveItemSettings(itemId, settings, screenId));
-    setSaveNote(res.error ?? "Saved to this setlist");
+    afterSave(res.error);
   }
 
   async function flushTransition(itemId: string) {
@@ -171,7 +195,7 @@ export function SetlistPlayer({
     transPending.current.delete(itemId);
     transTimers.current.delete(itemId);
     const res = await tracked(itemId, () => saveItemTransition(itemId, t.mode, t.chords, screenId));
-    setSaveNote(res.error ?? "Saved to this setlist");
+    afterSave(res.error);
   }
 
   async function flushBody(itemId: string) {
@@ -180,7 +204,7 @@ export function SetlistPlayer({
     bodyPending.current.delete(itemId);
     bodyTimers.current.delete(itemId);
     const res = await tracked(itemId, () => saveItemBody(itemId, body, screenId));
-    setSaveNote(res.error ?? "Saved to this setlist");
+    afterSave(res.error);
   }
 
   useEffect(() => {
@@ -190,7 +214,13 @@ export function SetlistPlayer({
     const bp = bodyPending.current;
     const tt = transTimers.current;
     const tp = transPending.current;
+    const rm = removing.current;
     return () => {
+      // Songs still waiting out their Undo are removed now, since there is no page left to undo on.
+      for (const [id, r] of rm) {
+        clearTimeout(r.timer);
+        void removeSetlistItem(setlist.id, id);
+      }
       for (const timer of t.values()) clearTimeout(timer);
       for (const timer of bt.values()) clearTimeout(timer);
       for (const timer of tt.values()) clearTimeout(timer);
@@ -198,7 +228,13 @@ export function SetlistPlayer({
       for (const [id, settings] of p) void saveItemSettings(id, settings, screenId);
       for (const [id, body] of bp) void saveItemBody(id, body, screenId);
     };
-  }, [screenId]);
+  }, [screenId, setlist.id]);
+
+  /** Saves finished: one "Saved" toast however many changes went through, or the error. */
+  function afterSave(error?: string) {
+    setSaveNote(null);
+    toast(error ?? "Saved to this setlist", { id: "saved", tone: error ? "error" : "success", ms: 2200 });
+  }
 
   /** This setlist's own chords for a song (null goes back to the song's). Shown at once, saved a moment later. */
   function changeBody(itemId: string, body: string | null) {
@@ -305,14 +341,18 @@ export function SetlistPlayer({
     if (res.error) setError(res.error);
   }
 
-  async function remove(id: string) {
+  /** Takes a song out of the list. It disappears at once; the delete itself waits a few seconds so Undo can bring it back. */
+  function remove(id: string) {
     const from = items.findIndex((i) => i.id === id);
     if (from < 0) return;
+    const item = items[from];
     const rest = items.filter((i) => i.id !== id);
+    const wasCurrent = id === viewId;
+    const wasStage = id === stageId;
     // If the song on screen is removed, move on to the one that takes its place.
     if (id === currentId) setCurrentId((rest[from] ?? rest[from - 1])?.id ?? null);
     // If the song on stage is removed, the one that takes its place goes on stage instead of jumping to the first.
-    if (id === stageId) {
+    if (wasStage) {
       const neighbour = rest[from] ?? rest[from - 1];
       if (neighbour) void sendToStage(neighbour.id);
       else setActiveId(null);
@@ -326,9 +366,33 @@ export function SetlistPlayer({
     transPending.current.delete(id);
     clearTimeout(transTimers.current.get(id));
     setError(null);
+    removing.current.set(id, { timer: setTimeout(() => void finishRemove(id), UNDO_MS), item, index: from, wasStage, wasCurrent });
+    toast(`Removed “${item.song.title}”`, { ms: UNDO_MS, action: { label: "Undo", onClick: () => undoRemove(id) } });
+  }
+
+  /** The Undo time is up: delete the song for good. */
+  async function finishRemove(id: string) {
+    const entry = removing.current.get(id);
+    if (!entry) return;
+    removing.current.delete(id);
     const res = await removeSetlistItem(setlist.id, id);
     structuralRev.current++;
-    if (res.error) setError(res.error);
+    if (res.error) {
+      // It couldn't be removed, so it is still in the setlist: show it again.
+      setError(res.error);
+      setItems((list) => (list.some((i) => i.id === id) ? list : insertAt(list, entry.item, entry.index)));
+    }
+  }
+
+  function undoRemove(id: string) {
+    const entry = removing.current.get(id);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    removing.current.delete(id);
+    structuralRev.current++;
+    setItems((list) => insertAt(list, entry.item, entry.index));
+    if (entry.wasStage) void sendToStage(id);
+    else if (entry.wasCurrent) setCurrentId(id);
   }
 
   /** Saves the name, date and expiry. Returns whether it worked. */
@@ -340,16 +404,15 @@ export function SetlistPlayer({
       setSaved({ name: name.trim(), date });
       setName(name.trim());
     }
-    setInfoNote(res.error ?? "Saved.");
+    setInfoNote(res.error ?? null);
+    if (!res.error) toast("Setlist saved", { id: "saved", tone: "success", ms: 2200 });
     return !res.error;
   }
 
   // ---- live updates from other screens -------------------------------------
 
   function notify(text: string) {
-    const id = ++noticeId.current;
-    setNotices((n) => [...n.slice(-2), { id, text }]);
-    noticeTimers.current.push(setTimeout(() => setNotices((n) => n.filter((x) => x.id !== id)), 6000));
+    toast(text, { ms: 6000 });
   }
 
   function flash(ids: string[]) {
@@ -400,7 +463,9 @@ export function SetlistPlayer({
       ...transPending.current.keys(),
       ...savingIds.current.keys(),
     ]);
-    const merged = mergeRemote(local, state.items, { pendingIds, editingId: editingRef.current });
+    // Songs waiting out their Undo are gone here, whatever the server still says.
+    const remote = state.items.filter((i) => !removing.current.has(i.id));
+    const merged = mergeRemote(local, remote, { pendingIds, editingId: editingRef.current });
 
     const unchanged = merged.items.length === local.length && merged.items.every((it, i) => it === local[i]);
     if (!unchanged) setItems(merged.items);
@@ -591,7 +656,7 @@ export function SetlistPlayer({
             </div>
             <p className="text-sm text-muted">
               The settings below are saved for this setlist only.
-              {saveNote && <span role="status"> {saveNote}.</span>}
+              {saveNote && <span role="status"> {saveNote}</span>}
             </p>
             <div data-tour="setlist-settings" className="space-y-6">
               <SongSettingsPanel
@@ -644,9 +709,19 @@ export function SetlistPlayer({
         </div>
       </Modal>
 
-      {!media && <CornerMenu role={role} onChange={changeRole} />}
+      {!media && (
+        <CornerMenu
+          role={role}
+          onChange={changeRole}
+          night={night}
+          onNight={setNight}
+          autoHide={autoHide}
+          onAutoHide={setAutoHide}
+          faded={hideControls}
+        />
+      )}
 
-      <LiveFrame live={liveView} onExit={() => setLive(false)} hideExit={!media} liveClassName="pt-14 lg:pt-6">
+      <LiveFrame live={liveView} onExit={() => setLive(false)} hideExit={!media} liveClassName={`pt-14 lg:pt-6 ${night && !media ? "night" : ""} ${hideControls ? "cursor-none" : ""}`}>
         <div className={`flex flex-col gap-4 lg:flex-row ${liveView ? "h-full" : ""}`}>
           <div data-tour="setlist-song" className="min-h-0 min-w-0 flex-1 max-lg:pb-14">
             {media && current && editChords && !live ? (
@@ -671,7 +746,22 @@ export function SetlistPlayer({
               />
               </>
             ) : current ? (
-              <CurrentSong item={current} live={liveView} />
+              <div className={`flex flex-col ${liveView ? "h-full" : SCREEN_HEIGHT}`}>
+                <StageStrip
+                  role={role}
+                  stageTitle={items.find((i) => i.id === stageId)?.song.title ?? null}
+                  viewingStage={viewId === stageId}
+                  stageScreens={sync.roles.stage ?? 0}
+                  onPut={() => void sendToStage(current.id)}
+                  onGoToStage={() => stageId && setCurrentId(stageId)}
+                />
+                {media && !liveView && (
+                  <SongToolbar originalKey={current.song.original_key} settings={current.settings} onChange={(s) => changeSettings(current.id, s)} />
+                )}
+                <div className="min-h-0 flex-1">
+                  <CurrentSong item={current} />
+                </div>
+              </div>
             ) : (
               <div className="rounded-md border border-dashed border-line p-8 text-center text-muted">
                 <p className="font-medium text-foreground">{setlist.name}</p>
@@ -682,9 +772,9 @@ export function SetlistPlayer({
           <div
             className={`w-full flex-none lg:w-72 ${
               liveView ? "lg:h-auto lg:pt-10" : "lg:h-[calc(100dvh-7.5rem)]"
-            } max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[25] max-lg:rounded-t-2xl max-lg:border max-lg:border-b-0 max-lg:border-line max-lg:bg-background max-lg:px-4 max-lg:shadow-[0_-8px_30px_rgba(0,0,0,0.18)] max-lg:transition-[height] ${
+            } max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-[25] max-lg:rounded-t-2xl max-lg:border max-lg:border-b-0 max-lg:border-line max-lg:bg-background max-lg:px-4 max-lg:shadow-[0_-8px_30px_rgba(0,0,0,0.18)] max-lg:transition-[height,transform,opacity] ${
               railOpen ? "max-lg:h-[min(82dvh,44rem)]" : "max-lg:h-14 max-lg:overflow-hidden"
-            }`}
+            } ${hideControls ? "lg:hidden max-lg:pointer-events-none max-lg:translate-y-full max-lg:opacity-0" : ""}`}
           >
             <button
               type="button"
@@ -745,24 +835,16 @@ export function SetlistPlayer({
           </div>
         </div>
       </LiveFrame>
-
-      <div aria-live="polite" className="pointer-events-none fixed bottom-4 left-4 z-[60] flex max-w-sm flex-col gap-2">
-        {notices.map((n) => (
-          <p key={n.id} className="anim-rise pointer-events-auto rounded-lg border border-line bg-surface px-3 py-2 text-sm shadow-lg">
-            {n.text}
-          </p>
-        ))}
-      </div>
     </>
   );
 }
 
-const CurrentSong = memo(function CurrentSong({ item, live }: { item: SetlistItem; live: boolean }) {
+const CurrentSong = memo(function CurrentSong({ item }: { item: SetlistItem }) {
   const { keyLabel } = deriveSong(item.song.original_key, item.settings);
   const sections = useSongSections(effectiveBody(item), item.song.original_key, item.settings);
   return (
     <PreviewTab
-      fill={live}
+      fill
       info={{ title: item.song.title, key: keyLabel, tempo: item.song.tempo ? String(item.song.tempo) : "" }}
       sections={sections}
       size={item.settings.fontSize === FIT ? "fit" : item.settings.fontSize}

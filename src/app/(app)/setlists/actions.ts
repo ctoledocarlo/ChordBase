@@ -288,7 +288,14 @@ export async function sendMessage(
     .insert({ setlist_id: setlistId, sender_role: role, sender, body: text })
     .select(MESSAGE_COLUMNS)
     .single<ChatMessage>();
-  if (error || !data) return { error: "Couldn't send that. Please try again." };
+  if (error || !data) {
+    console.error("sendMessage failed", error);
+    // The usual cause is a database migration that hasn't been run yet; say which.
+    if (error?.code === "42P01" || error?.code === "PGRST205") return { error: "Chat isn't set up in the database yet (run migration 20261022000000_setlist_messages.sql)." };
+    if (error?.code === "23502") return { error: "Chat needs the latest database update (run migration 20261025000000_performance.sql)." };
+    if (error?.code === "42501") return { error: "The database refused that message (check the chat policies from migrations 20261022 and 20261025)." };
+    return { error: `Couldn't send that${error?.code ? ` (${error.code})` : ""}. Please try again.` };
+  }
   return { message: data };
 }
 

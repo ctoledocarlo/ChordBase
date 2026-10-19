@@ -38,6 +38,13 @@ export function useSongSections(body: string, originalKey: string, settings: Pre
 
 export { deriveSong };
 
+/** The text size one step bigger or smaller than what is showing now (reading the fitted size off the screen when set to fit). */
+export function steppedSize(settings: PresetSettings, delta: number): number {
+  const el = document.querySelector<HTMLElement>("[data-fit-area]");
+  const current = settings.fontSize === FIT ? parseFloat(el?.style.fontSize || "16") : settings.fontSize;
+  return Math.min(40, Math.max(12, Math.round(current + delta)));
+}
+
 export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
@@ -177,11 +184,7 @@ export function SongSettingsPanel({
   const { capo, spelling: spellingChoice, showChords, fontSize } = settings;
   const { hasKey, soundingKey, shownShapeKey } = deriveSong(originalKey, settings);
 
-  function stepSize(delta: number) {
-    const el = document.querySelector<HTMLElement>("[data-fit-area]");
-    const current = fontSize === FIT ? parseFloat(el?.style.fontSize || "16") : fontSize;
-    set({ fontSize: Math.min(40, Math.max(12, Math.round(current + delta))) });
-  }
+  const stepSize = (delta: number) => set({ fontSize: steppedSize(settings, delta) });
 
   return (
     <>

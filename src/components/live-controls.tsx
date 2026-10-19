@@ -3,7 +3,7 @@
 import { FIT } from "@/lib/setlist-settings";
 import type { SetlistItem } from "@/lib/setlists";
 import type { PresetSettings } from "@/lib/songs";
-import { ChordStylePicker, KeyPicker } from "./song-settings";
+import { ChordStylePicker, KeyPicker, steppedSize } from "./song-settings";
 
 /**
  * Key, chord style, capo and text size for the song on screen, packed into three rows so it can
@@ -22,11 +22,9 @@ export function LiveControls({
   const { settings } = item;
   const set = (patch: Partial<PresetSettings>) => onChange({ ...settings, ...patch });
 
-  function stepSize(delta: number) {
-    const el = document.querySelector<HTMLElement>("[data-fit-area]");
-    const current = settings.fontSize === FIT ? parseFloat(el?.style.fontSize || "16") : settings.fontSize;
-    set({ fontSize: Math.min(40, Math.max(12, Math.round(current + delta))) });
-  }
+  const stepSize = (delta: number) => set({ fontSize: steppedSize(settings, delta) });
+  // One tap to very large text, for a dim stage or a musician standing back from the screen.
+  const BIG = 36;
 
   const small = "btn px-2 py-0.5 text-[0.8125rem]";
 
@@ -48,7 +46,7 @@ export function LiveControls({
         <ChordStylePicker compact settings={settings} onChange={onChange} />
       </div>
 
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className="grid grid-cols-4 gap-1.5">
         <button type="button" className={small} onClick={() => stepSize(-2)} aria-label="Smaller text">
           A−
         </button>
@@ -62,6 +60,15 @@ export function LiveControls({
           onClick={() => set({ fontSize: FIT })}
         >
           Fit
+        </button>
+        <button
+          type="button"
+          className={`${small} ${settings.fontSize >= BIG - 2 ? "btn-primary" : ""}`}
+          aria-pressed={settings.fontSize >= BIG - 2}
+          onClick={() => set({ fontSize: BIG })}
+          title="Very large text"
+        >
+          Big
         </button>
       </div>
     </div>

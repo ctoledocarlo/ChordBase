@@ -15,10 +15,16 @@ export function AddToSetlist({
   songId,
   songTitle,
   setlists,
+  bar = false,
+  tourId,
 }: {
   songId: string;
   songTitle: string;
   setlists: SetlistChoice[];
+  /** The copy in the phone's bottom bar: sized to sit beside other buttons. */
+  bar?: boolean;
+  /** Marks the button for the tutorials (only one copy on the page should have it). */
+  tourId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -58,7 +64,12 @@ export function AddToSetlist({
 
   return (
     <>
-      <button data-tour="song-add-setlist" type="button" className="btn w-full" onClick={() => setOpen(true)}>
+      <button
+        data-tour={tourId}
+        type="button"
+        className={bar ? "btn" : "btn w-full"}
+        onClick={() => setOpen(true)}
+      >
         Add to setlist
       </button>
       <Modal open={open} title="Add to setlist" onClose={() => setOpen(false)}>

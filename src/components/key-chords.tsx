@@ -1,18 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useStoredFlag } from "./use-stored-flag";
 import { chordsInKey, chordsOf, parseChord, pitchClass } from "@/lib/chords";
 import { effectiveBody } from "@/lib/setlist-body";
 import type { SetlistItem } from "@/lib/setlists";
 import { ChevronIcon } from "./icons";
 import { deriveSong, useSongSections } from "./song-settings";
 
+const tallScreen = () => window.innerHeight >= 820;
+
 /**
  * Every chord that belongs to the key the song is shown in, for a quick check or a quick change.
  * The ones this song uses are marked. It follows the key and capo chosen for the setlist.
  */
 export function KeyChords({ item }: { item: SetlistItem }) {
-  const [open, setOpen] = useState(true);
+  // Open on a tall screen the first time, folded on a short one, and then however it was left.
+  const [open, setOpen] = useStoredFlag("chordbase.keyChordsOpen", true, tallScreen);
   const [sevenths, setSevenths] = useState(false);
   const { hasKey, shownShapeKey, soundingKey, spelling } = deriveSong(item.song.original_key, item.settings);
   const sections = useSongSections(effectiveBody(item), item.song.original_key, item.settings);
@@ -35,7 +39,7 @@ export function KeyChords({ item }: { item: SetlistItem }) {
       <div className="flex items-center gap-1.5">
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => setOpen(!open)}
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-[0.6875rem] font-medium uppercase tracking-wide text-muted hover:text-foreground"
         >

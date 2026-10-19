@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeFilterCount, filtersToParams, pageList, parseSongFilters } from "./song-filters";
+import { activeFilterCount, filterChips, filtersToParams, pageList, parseSongFilters } from "./song-filters";
 
 describe("song filters in the URL", () => {
   it("starts with no filters", () => {
@@ -43,5 +43,25 @@ describe("song filters in the URL", () => {
     expect(filtersToParams(parseSongFilters({ q: "grace" })).toString()).toBe("q=grace");
     expect(filtersToParams(parseSongFilters({ q: "grace", sort: "title" })).toString()).toBe("q=grace&sort=title");
     expect(filtersToParams(parseSongFilters({ sort: "tempo" })).toString()).toBe("sort=tempo");
+  });
+
+  it("makes a chip for each applied filter, and each chip removes only its own", () => {
+    const f = parseSongFilters({ q: "grace", key: ["G", "D"], mode: "major", artist: "Someone", tempo_min: "80", tempo_max: "120", ts: "3/4", capo: "0" });
+    const chips = filterChips(f);
+    expect(chips.map((c) => c.label)).toEqual(["Key G", "Key D", "Major keys", "Someone", "80–120 BPM", "3/4", "No capo"]);
+    // The search words stay, and so does everything else the chip didn't own.
+    const withoutG = chips[0].without;
+    expect(withoutG.keys).toEqual(["D"]);
+    expect(withoutG.q).toBe("grace");
+    expect(activeFilterCount(withoutG)).toBe(activeFilterCount(f));
+    const withoutTempo = chips.find((c) => c.id === "tempo")!.without;
+    expect([withoutTempo.tempoMin, withoutTempo.tempoMax]).toEqual([null, null]);
+    expect(activeFilterCount(withoutTempo)).toBe(activeFilterCount(f) - 1);
+  });
+
+  it("words a half-open tempo range, and has no chips with no filters", () => {
+    expect(filterChips(parseSongFilters({ tempo_min: "90" }))[0].label).toBe("90+ BPM");
+    expect(filterChips(parseSongFilters({ tempo_max: "70" }))[0].label).toBe("Up to 70 BPM");
+    expect(filterChips(parseSongFilters({ q: "grace" }))).toEqual([]);
   });
 });

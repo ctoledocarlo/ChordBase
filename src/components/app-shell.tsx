@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { BackLink } from "./back-link";
 import { CloseIcon, MenuIcon } from "./icons";
+import { KeyboardShortcuts } from "./keyboard-shortcuts";
 import { Logo } from "./logo";
-import { SIDEBAR_SLOT_ID } from "./sidebar-portal";
+import { OPEN_SIDEBAR_EVENT, SIDEBAR_SLOT_ID } from "./sidebar-portal";
 import {
   SIDEBAR_DEFAULT,
   SIDEBAR_MAX,
@@ -16,6 +17,7 @@ import {
   useSidebarWidth,
 } from "./sidebar-width";
 import { ThemeToggle } from "./theme-toggle";
+import { ToastProvider } from "./toast";
 import { HelpMenu } from "./tutorial/help-menu";
 import { TutorialProvider, TutorialRouteWatcher } from "./tutorial/tutorial-provider";
 
@@ -26,6 +28,13 @@ import { TutorialProvider, TutorialRouteWatcher } from "./tutorial/tutorial-prov
 export function AppShell({ account, children }: { account: ReactNode; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
+
+  // Pages with a button of their own for the sidebar (the Filters button on Songs) ask for it to open.
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(OPEN_SIDEBAR_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SIDEBAR_EVENT, onOpen);
+  }, []);
 
   const savedWidth = useSidebarWidth();
   const [dragWidth, setDragWidth] = useState<number | null>(null);
@@ -56,6 +65,13 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
 
   return (
     <TutorialProvider openSidebar={setOpen}>
+    <ToastProvider>
+    <a
+      href="#main"
+      className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-md focus:bg-foreground focus:px-3 focus:py-2 focus:text-sm focus:text-background"
+    >
+      Skip to content
+    </a>
     <div className="flex flex-1 flex-col">
       <header className="sticky top-0 z-20 border-b border-line bg-background">
         <div className="flex h-14 items-stretch gap-3 px-3 sm:gap-6 sm:px-4 lg:px-6">
@@ -80,11 +96,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
       <div className="flex flex-1 flex-col lg:flex-row">
         <Suspense fallback={null}>
           <SidebarGate>
-          <div className="border-b border-line px-3 py-1.5 sm:px-4 lg:hidden">
-            <button type="button" onClick={() => setOpen(true)} className="btn">
-              <MenuIcon /> Page options
-            </button>
-          </div>
+          <PageOptionsBar onOpen={() => setOpen(true)} />
 
           {open && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={close} aria-hidden />}
 
@@ -130,7 +142,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
           </SidebarGate>
         </Suspense>
 
-        <main className="min-w-0 flex-1 px-4 py-5 sm:py-8 lg:px-10">
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 px-4 py-5 outline-none sm:py-8 lg:px-10">
           <Suspense fallback={null}>
             <PageTopBack />
           </Suspense>
@@ -141,7 +153,22 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
     <Suspense fallback={null}>
       <TutorialRouteWatcher />
     </Suspense>
+    <KeyboardShortcuts />
+    </ToastProvider>
     </TutorialProvider>
+  );
+}
+
+/** The "Page options" bar that opens the sidebar on phones. Songs has its own Filters button instead. */
+function PageOptionsBar({ onOpen }: { onOpen: () => void }) {
+  const pathname = usePathname();
+  if (pathname === "/") return null;
+  return (
+    <div className="border-b border-line px-3 py-1.5 sm:px-4 lg:hidden">
+      <button type="button" onClick={onOpen} className="btn">
+        <MenuIcon /> Page options
+      </button>
+    </div>
   );
 }
 

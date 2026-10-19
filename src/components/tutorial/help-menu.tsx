@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { SHORTCUTS_EVENT } from "../keyboard-shortcuts";
 import { Modal } from "../modal";
 import { useFinishedTutorials, useTutorial } from "./tutorial-provider";
 import {
@@ -128,6 +129,17 @@ export function HelpMenu() {
               className="w-full rounded-md px-2.5 py-2 text-left text-sm text-muted hover:bg-hover hover:text-foreground"
             >
               Browse all tutorials…
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                window.dispatchEvent(new Event(SHORTCUTS_EVENT));
+              }}
+              className="w-full rounded-md px-2.5 py-2 text-left text-sm text-muted hover:bg-hover hover:text-foreground"
+            >
+              Keyboard shortcuts
             </button>
           </div>
         </div>

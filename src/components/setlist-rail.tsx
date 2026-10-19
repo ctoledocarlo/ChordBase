@@ -132,7 +132,7 @@ export function SetlistRail({
   const who = ROLES.filter((r) => (roles[r.value] ?? 0) > 0).map((r) => `${roles[r.value]} ${r.label}`);
 
   return (
-    <aside aria-label="Setlist" data-tour="setlist-rail" className="flex h-full min-h-0 flex-col border-line lg:border-l lg:pl-4">
+    <aside aria-label="Setlist" data-tour="setlist-rail" data-no-autohide className="flex h-full min-h-0 flex-col overflow-y-auto border-line lg:border-l lg:pl-4">
       <div className="mb-1.5 flex flex-none items-center gap-2">
         <p
           role="status"
@@ -166,6 +166,7 @@ export function SetlistRail({
         <div data-tour="setlist-add" className="flex-none border-b border-line pb-1.5">
           <input
             type="search"
+            data-search=""
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Add a song (title or lyrics)…"
@@ -264,7 +265,7 @@ export function SetlistRail({
 
       {reference}
 
-      <div data-tour="setlist-list" className="min-h-0 flex-[3] overflow-y-auto py-2">
+      <div data-tour="setlist-list" className="min-h-[6.5rem] flex-[3] overflow-y-auto py-2">
         <p className="mb-1 flex items-center justify-between gap-2 text-[0.6875rem] font-medium uppercase tracking-wide text-muted">
           <span>
             Setlist · {items.length} {items.length === 1 ? "song" : "songs"}

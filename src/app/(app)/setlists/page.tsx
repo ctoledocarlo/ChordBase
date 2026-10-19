@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { DeleteButton } from "@/components/delete-button";
+import { EmptyState } from "@/components/empty-state";
+import { ListPageSkeleton } from "@/components/skeletons";
 import { NewSetlist } from "@/components/new-setlist";
 import { SetlistDateRange } from "@/components/setlist-date-range";
 import { SearchForm } from "@/components/search-form";
@@ -10,7 +12,7 @@ import { listSetlists, type SetlistSummary } from "@/lib/setlists";
 
 export default function SetlistsPage({ searchParams }: PageProps<"/setlists">) {
   return (
-    <Suspense>
+    <Suspense fallback={<ListPageSkeleton />}>
       <Setlists searchParams={searchParams} />
     </Suspense>
   );
@@ -50,7 +52,23 @@ async function Setlists({ searchParams }: { searchParams: PageProps<"/setlists">
       <SetlistDateRange q={q} from={from} to={to} />
 
       {total === 0 ? (
-        <p className="mt-10 text-muted">{narrowed ? "Nothing matches that. Try a different name or date." : "No setlists yet. Create your first one."}</p>
+        narrowed ? (
+          <EmptyState
+            art="search"
+            title="No setlist matches that"
+            actions={
+              <Link href="/setlists" className="btn">
+                Clear the search
+              </Link>
+            }
+          >
+            Try a different name or date, or widen the dates.
+          </EmptyState>
+        ) : (
+          <EmptyState art="setlists" title="No setlists yet">
+            Press “New setlist” above to plan a service, or open any song and use “Add to setlist”.
+          </EmptyState>
+        )
       ) : (
         <div data-tour="setlists-list">
           <Group title="Upcoming" rows={upcoming} />
@@ -69,7 +87,7 @@ function Group({ title, rows }: { title: string; rows: SetlistSummary[] }) {
       <ul className="divide-y divide-line border-y border-line">
         {rows.map((s) => (
           <li key={s.id} className="flex items-center gap-1 hover:bg-hover">
-            <Link href={`/setlists/${s.id}`} className="flex min-w-0 flex-1 items-baseline gap-4 px-1 py-3.5">
+            <Link data-row="" href={`/setlists/${s.id}`} className="flex min-w-0 flex-1 items-baseline gap-4 px-1 py-3.5">
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{s.name}</span>
                 {/* The date has no room beside the name on a phone, so it goes underneath. */}

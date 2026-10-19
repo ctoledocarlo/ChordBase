@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, type FormEvent } from "react";
 import { parseChord, pitchClass } from "@/lib/chords";
 import { SORTS, activeFilterCount, defaultSort, filtersToParams, type SongFacets, type SongFilters } from "@/lib/song-filters";
-import { SidebarPortal } from "./sidebar-portal";
+import { OPEN_SIDEBAR_EVENT, SidebarPortal } from "./sidebar-portal";
 import { Group } from "./song-settings";
 
 /** Keys in the order of the scale (C, C#, D ...), majors before minors. */
@@ -15,6 +15,15 @@ function sortKeys(keys: string[]): string[] {
     return chord ? pitchClass(chord.root) * 2 + (/^m(?!aj|a)/.test(chord.quality) ? 1 : 0) : 100;
   };
   return [...keys].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+}
+
+/** On phones the filters live in the drawer; this button sits by the search box and opens it, with a count of what is applied. */
+export function FiltersButton({ count }: { count: number }) {
+  return (
+    <button type="button" className="btn flex-none lg:hidden" onClick={() => window.dispatchEvent(new Event(OPEN_SIDEBAR_EVENT))}>
+      Filters{count > 0 ? ` (${count})` : ""}
+    </button>
+  );
 }
 
 /**

@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { SongSkeleton } from "@/components/skeletons";
 import { SetlistPlayer } from "@/components/setlist-player";
 import { getSetlist, listMessages } from "@/lib/setlists";
 import { listChordShortcuts } from "@/lib/songs";
 
 export default function SetlistPage({ params }: PageProps<"/setlists/[id]">) {
   return (
-    <Suspense fallback={<p className="text-muted">Loading…</p>}>
+    <Suspense fallback={<SongSkeleton />}>
       <Setlist params={params} />
     </Suspense>
   );

@@ -90,6 +90,29 @@ export function activeFilterCount(f: SongFilters): number {
   );
 }
 
+/** One applied filter, shown as a chip that removes it. `without` is the filters with just this one cleared. */
+export type FilterChip = { id: string; label: string; without: SongFilters };
+
+/** The filters narrowing the list, one chip each (every chosen key is its own chip). */
+export function filterChips(f: SongFilters): FilterChip[] {
+  const chips: FilterChip[] = [];
+  for (const k of f.keys) chips.push({ id: `key:${k}`, label: `Key ${k}`, without: { ...f, keys: f.keys.filter((x) => x !== k) } });
+  if (f.mode) chips.push({ id: "mode", label: f.mode === "major" ? "Major keys" : "Minor keys", without: { ...f, mode: "" } });
+  if (f.artist) chips.push({ id: "artist", label: f.artist, without: { ...f, artist: "" } });
+  if (f.tempoMin !== null || f.tempoMax !== null) {
+    const label =
+      f.tempoMin !== null && f.tempoMax !== null
+        ? `${f.tempoMin}–${f.tempoMax} BPM`
+        : f.tempoMin !== null
+          ? `${f.tempoMin}+ BPM`
+          : `Up to ${f.tempoMax} BPM`;
+    chips.push({ id: "tempo", label, without: { ...f, tempoMin: null, tempoMax: null } });
+  }
+  if (f.timeSig) chips.push({ id: "ts", label: f.timeSig, without: { ...f, timeSig: "" } });
+  if (f.capo !== null) chips.push({ id: "capo", label: f.capo === 0 ? "No capo" : `Capo ${f.capo}`, without: { ...f, capo: null } });
+  return chips;
+}
+
 /** Page numbers to show: the first, the last and the ones around the current page, with gaps. */
 export function pageList(page: number, pages: number): (number | "gap")[] {
   const wanted = new Set([1, pages, page - 1, page, page + 1]);

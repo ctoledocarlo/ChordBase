@@ -77,6 +77,7 @@ export function SearchForm({
     >
       <input
         type="search"
+        data-search=""
         name="q"
         value={value}
         onChange={(e) => {

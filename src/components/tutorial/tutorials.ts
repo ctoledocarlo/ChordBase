@@ -128,9 +128,15 @@ const PAGES: Tutorial[] = [
         body: "Narrow the list by key, major or minor, artist, tempo, time signature or capo, and choose how it's sorted. “Clear all” puts everything back.",
       },
       {
+        target: "songs-chips",
+        title: "What's applied",
+        body: "Each filter you choose shows up here as a chip. Click a chip to take just that filter off, or “Clear all”. On a phone, the Filters button next to the search box opens the filters.",
+        optional: true,
+      },
+      {
         target: "songs-list",
         title: "Your songs",
-        body: "Each row shows the song's key, title, artist and tempo. Click a song to open it, change its key and play it.",
+        body: "Each row shows the song's key, title, artist and tempo. Click a song to open it, change its key and play it. Press / to jump to the search box, then ↓ to walk down the results.",
       },
       {
         target: "songs-pages",
@@ -162,6 +168,11 @@ const PAGES: Tutorial[] = [
         target: "song-screen",
         title: "The song",
         body: "Lyrics with the chords above the words, sized to fit your screen. Changes you make in the sidebar apply here straight away.",
+      },
+      {
+        target: "song-toolbar",
+        title: "Key, capo and size, close at hand",
+        body: "The bar above the song changes the key (with half-step buttons), the capo and the text size. The sidebar has the same, plus sharps and flats and chord style. On a phone, Live, the key and “Add to setlist” stay in a bar at the bottom.",
       },
       {
         target: "song-settings",
@@ -232,6 +243,18 @@ const PAGES: Tutorial[] = [
         body: "The song as it will be played in this setlist: its key, capo, chord style and any chords you changed here.",
       },
       {
+        target: "song-toolbar",
+        title: "Key, capo and size, close at hand",
+        body: "Above the song, change its key (with half-step buttons), the capo and the text size. These are saved to this setlist for this song, and every screen follows.",
+        optional: true,
+      },
+      {
+        target: "setlist-stage-strip",
+        title: "What's on stage",
+        body: "A line above the song says whether what you're looking at is on stage and how many Stage screens are connected. If you're on another song, it offers to put this one on stage or take you to the one that is.",
+        optional: true,
+      },
+      {
         target: "setlist-rail",
         rail: true,
         title: "The setlist",
@@ -241,7 +264,7 @@ const PAGES: Tutorial[] = [
         target: "setlist-list",
         rail: true,
         title: "Order and selection",
-        body: "Click a song to look at it. Drag the handle to reorder. The play button puts a song on stage, and the red bin removes it from this setlist (not from your library).",
+        body: "Click a song to look at it. Drag the handle to reorder. The play button puts a song on stage, and the red bin removes it from this setlist (not from your library). For a few seconds after removing one, “Undo” in the corner puts it back.",
       },
       {
         target: "setlist-add",

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useRef, useState, useTransition, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import {
   addChordShortcut,
   removeChordShortcut,
@@ -60,6 +61,9 @@ function startingSections(body: string | undefined): EditorSection[] {
   return parsed.length > 0 ? parsed : [{ id: "s1", label: UNNAMED, column: 0, lines: [{ text: "", chords: [] }] }];
 }
 
+/** The details and words as one string, to tell whether anything changed since the song was opened or saved. */
+const snapshot = (info: SongInfo, body: string) => JSON.stringify([info, body]);
+
 const sameTarget = (a: Target | null, b: Target) => !!a && a.sid === b.sid && a.line === b.line && a.pos === b.pos;
 
 export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song; shortcuts: ChordShortcut[] }) {
@@ -80,6 +84,11 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
     present: startingSections(song?.body),
     future: [],
   }));
+  // What the song looked like when the editor opened; anything different is an unsaved change.
+  const [baseline] = useState(() => snapshot(info, serializeSections(history.present)));
+  // Where the person was heading when we stopped them to ask about unsaved changes.
+  const [leaving, setLeaving] = useState<{ href: string; back: boolean } | null>(null);
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState("");
   const [editing, setEditingState] = useState<Target | null>(null);
   const editingRef = useRef<Target | null>(null);
@@ -106,6 +115,41 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
   const invalid = used.filter((c) => !isValidChord(c));
   const titleMissing = info.title.trim() === "";
   const columnCount = columnsOf(sections).length;
+  const dirty = snapshot(info, body) !== baseline;
+  // While saving, the page is about to move on by itself, so don't stop it.
+  const guarding = dirty && !pending;
+
+  // A dot in the tab title, and a question before the page is left (a link, or closing the tab) with unsaved changes.
+  useEffect(() => {
+    if (!guarding) return;
+    const original = document.title;
+    document.title = `• ${original}`;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!link || (link.target && link.target !== "_self") || link.origin !== window.location.origin) return;
+      if (link.pathname === window.location.pathname && link.search === window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaving({ href: link.pathname + link.search, back: link.hasAttribute("data-back") });
+    };
+    const onUnload = (e: BeforeUnloadEvent) => e.preventDefault();
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("beforeunload", onUnload);
+    return () => {
+      document.title = original;
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("beforeunload", onUnload);
+    };
+  }, [guarding]);
+
+  function leave() {
+    if (!leaving) return;
+    const { href, back } = leaving;
+    setLeaving(null);
+    if (back && window.history.length > 1) router.back();
+    else router.push(href);
+  }
 
   const setEditing = (t: Target | null) => {
     editingRef.current = t;
@@ -430,6 +474,20 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
       {tab === "preview" && <PreviewTab info={info} sections={sections} size={textSize} onMove={moveSection} />}
       </div>
 
+      <Modal open={leaving !== null} title="Leave without saving?" onClose={() => setLeaving(null)}>
+        <div className="space-y-5">
+          <p>You changed this song but haven&apos;t saved it.</p>
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+            <button type="button" className="btn" onClick={() => setLeaving(null)}>
+              Keep editing
+            </button>
+            <button type="button" className="btn" onClick={leave}>
+              Leave without saving
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal
         open={!!importState.choices}
         title="Which one?"
@@ -518,9 +576,15 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
         </nav>
 
         <div className="space-y-3">
-          <button data-tour="editor-save" type="submit" form="song-form" disabled={pending} className="btn btn-primary w-full">
+          <button data-tour="editor-save" type="submit" form="song-form" disabled={pending || !dirty} className="btn btn-primary w-full">
             {pending ? "Saving…" : "Save song"}
           </button>
+          {dirty && !pending && (
+            <p role="status" className="flex items-center gap-1.5 text-xs text-muted">
+              <span aria-hidden className="h-2 w-2 flex-none rounded-full bg-[#d97706]" />
+              Unsaved changes
+            </p>
+          )}
           <div className="grid gap-2">
             <button type="button" className="btn w-full" onClick={undo} disabled={history.past.length === 0}>
               <UndoIcon /> Undo

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { signOut } from "./actions";
 import { AppShell } from "@/components/app-shell";
+import { SongSkeleton } from "@/components/skeletons";
 import { getCurrentChurch } from "@/lib/church";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
@@ -15,7 +16,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
       <Suspense fallback={null}>
         <ChurchNotice />
       </Suspense>
-      <Suspense fallback={<p className="text-muted">Loading…</p>}>{children}</Suspense>
+      <Suspense fallback={<SongSkeleton />}>{children}</Suspense>
     </AppShell>
   );
 }
