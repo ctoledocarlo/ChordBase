@@ -66,6 +66,11 @@ export function useSetlistSync(setlistId: string, screenId: string, role: Screen
 
     function connect(supabase: ReturnType<typeof createClient>) {
       const channel = supabase.channel(`setlist:${setlistId}`, { config: { presence: { key: screenId } } });
+      const onTeam = (p: { eventType: string; new: unknown }) => {
+        if (p.eventType === "DELETE") return catchUpSoon();
+        const row = p.new as Row;
+        if (row?.setlist_id === setlistId && row?.edited_by !== screenId) catchUpSoon();
+      };
 
       // Listens church-wide and picks out this setlist's rows here, since Realtime can't filter deletes.
       channel
@@ -87,6 +92,11 @@ export function useSetlistSync(setlistId: string, screenId: string, role: Screen
           const row = p.new as Row;
           if (row?.id === setlistId && row?.edited_by !== screenId) catchUpSoon();
         })
+        // Views, notes and the checklist: someone else's change makes this screen fetch the setlist again.
+        // (A delete doesn't say which setlist it was in, so any delete does.)
+        .on("postgres_changes", { event: "*", schema: "public", table: "setlist_views" }, (p) => onTeam(p))
+        .on("postgres_changes", { event: "*", schema: "public", table: "setlist_notes" }, (p) => onTeam(p))
+        .on("postgres_changes", { event: "*", schema: "public", table: "setlist_tasks" }, (p) => onTeam(p))
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "songs" }, (p) => {
           const id = (p.new as Row)?.id;
           if (typeof id === "string" && latest.current.hasSong(id)) catchUpSoon();

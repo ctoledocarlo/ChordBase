@@ -41,6 +41,7 @@ const songRow = (i, withBody = false) => ({
   artist: `${pick(WORDS)} band`,
   original_key: pick(["G", "C", "D", "Em", "A"]),
   tempo: 70 + Math.floor(rand() * 60),
+  tags: i % 4 === 0 ? ["Easter"] : i % 5 === 0 ? ["slow", "communion"] : [],
   ...(withBody ? { body: body() } : {}),
 });
 
@@ -53,7 +54,22 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
   const church = { id: IDS.church, name: "Bench church", slug: "bench" };
   const futureDate = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
 
-  const fullSong = { ...songRow(0, true), id: IDS.song, church_id: IDS.church, default_capo: 0, time_signature: "4/4", ccli_number: "", tags: [], updated_at: new Date().toISOString() };
+  const fullSong = {
+    ...songRow(0, true),
+    id: IDS.song,
+    church_id: IDS.church,
+    default_capo: 0,
+    time_signature: "4/4",
+    ccli_number: "",
+    tags: ["Easter", "slow"],
+    melody_low: "E3",
+    melody_high: "D4",
+    links: [
+      { label: "Studio recording", url: "https://example.com/song", kind: "recording" },
+      { label: "Chart", url: "https://example.com/chart.pdf", kind: "sheet" },
+    ],
+    updated_at: new Date().toISOString(),
+  };
   const setlistItems = Array.from({ length: 14 }, (_, i) => ({
     id: randomUUID(),
     song_id: randomUUID(),
@@ -62,9 +78,28 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     body_override: null,
     transition_mode: "auto",
     transition_chords: "",
-    songs: { ...songRow(i, true), default_capo: 0, time_signature: "4/4" },
+    singer_id: i === 0 ? "00000000-0000-4000-8000-0000000000d1" : null,
+    songs: { ...songRow(i, true), default_capo: 0, time_signature: "4/4", melody_low: "E3", melody_high: "D4", links: [] },
   }));
-  const setlistRow = (i) => ({ id: i === 0 ? IDS.setlist : randomUUID(), name: `Sunday ${i}`, service_date: futureDate(i - 10), expires_at: futureDate(20), active_item_id: null, setlist_items: [{ count: 14 }] });
+  const views = [
+    { id: "00000000-0000-4000-8000-0000000000e1", name: "Everyone", kind: "all", show_chords: true, position: 0 },
+    { id: "00000000-0000-4000-8000-0000000000e2", name: "Drums", kind: "instrument", show_chords: false, position: 1 },
+    { id: "00000000-0000-4000-8000-0000000000e3", name: "Keys", kind: "instrument", show_chords: true, position: 2 },
+  ];
+  const notes = [
+    { id: randomUUID(), item_id: setlistItems[0].id, view_id: views[0].id, body: "Start on the 2nd verse", updated_at: new Date().toISOString() },
+    { id: randomUUID(), item_id: setlistItems[0].id, view_id: views[1].id, body: "Brushes until the chorus", updated_at: new Date().toISOString() },
+  ];
+  const tasks = [
+    { id: randomUUID(), view_id: null, label: "Sound check done", done: true, done_by: "Media", position: 0 },
+    { id: randomUUID(), view_id: null, label: "Slides and lyrics ready", done: false, done_by: null, position: 1 },
+    { id: randomUUID(), view_id: views[1].id, label: "Kit tuned", done: false, done_by: null, position: 2 },
+  ];
+  const singers = [
+    { id: "00000000-0000-4000-8000-0000000000d1", name: "Maria", range_low: "G3", range_high: "D5" },
+    { id: "00000000-0000-4000-8000-0000000000d2", name: "Tom", range_low: "C3", range_high: "A4" },
+  ];
+  const setlistRow = (i) => ({ id: i === 0 ? IDS.setlist : randomUUID(), name: `Sunday ${i}`, service_date: futureDate(i - 10), expires_at: futureDate(20), active_item_id: null, timer_ends_at: null, setlist_items: [{ count: 14 }] });
   const setlists = Array.from({ length: 60 }, (_, i) => setlistRow(i));
   const listPage = Array.from({ length: 25 }, (_, i) => songRow(i, false));
   const searchPage = Array.from({ length: 25 }, (_, i) => songRow(i, true));
@@ -74,6 +109,7 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     artists: Array.from({ length: 120 }, (_, i) => `${pick(WORDS)} band ${i}`),
     time_signatures: ["4/4", "6/8"],
     capos: [0, 1, 2, 3],
+    tags: ["Easter", "communion", "slow"],
   };
 
   const server = createServer(async (req, res) => {
@@ -103,6 +139,12 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     const object = (req.headers.accept ?? "").includes("vnd.pgrst.object");
     const select = url.searchParams.get("select") ?? "";
 
+    // The filter choices (a database function, so a POST).
+    if (table === "rpc/song_facets") {
+      for await (const chunk of req) void chunk;
+      return send(200, facets);
+    }
+
     // The song list's database function: a page of songs, each with the total.
     if (table === "rpc/songs_page") {
       let raw = "";
@@ -114,14 +156,26 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
 
     // Writes: take the body, then answer like PostgREST (nothing back, or the row if asked).
     if (req.method === "POST" || req.method === "PATCH") {
-      for await (const chunk of req) void chunk;
+      let sent = "";
+      for await (const chunk of req) sent += chunk;
+      if (table === "rpc/merge_songs") return send(204);
       if (!(req.headers.prefer ?? "").includes("return=representation")) return send(204);
+      let body = {};
+      try {
+        body = JSON.parse(sent || "{}");
+      } catch {
+        // Not JSON; echo nothing.
+      }
+      const echo = (b) => ({ id: randomUUID(), ...b });
       const row =
         table === "setlist_messages"
           ? { id: randomUUID(), sender_role: "media", sender: "tab", body: "hello", created_at: new Date().toISOString() }
           : table === "setlist_items"
             ? setlistItems[0]
-            : {};
+            : Array.isArray(body)
+              ? body.map(echo)
+              : echo(body);
+      if (Array.isArray(row)) return send(201, row);
       return send(201, object ? row : [row]);
     }
 
@@ -129,6 +183,17 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     if (table === "rpc/song_facets") return send(200, facets);
     if (table === "chord_shortcuts") return send(200, [{ id: randomUUID(), chord: "G" }, { id: randomUUID(), chord: "D" }]);
     if (table === "setlist_messages") return send(200, messages);
+    if (table === "setlist_views") return send(200, views);
+    if (table === "setlist_notes") return send(200, notes);
+    if (table === "setlist_tasks") return send(200, tasks);
+    if (table === "singers") return send(200, singers);
+    if (table === "song_history") {
+      const plays = listPage.slice(0, 12).flatMap((s, i) => [
+        { song_id: s.id, played_on: futureDate(-7 * (i % 6) - 2), setlist_name: "Sunday Service" },
+        ...(i < 3 ? [{ song_id: s.id, played_on: futureDate(-7 * (i + 6) - 2), setlist_name: "Sunday Service" }] : []),
+      ]);
+      return send(200, url.searchParams.has("song_id") ? plays.slice(0, 4) : plays);
+    }
     if (table === "songs") {
       if (url.searchParams.has("id")) return send(200, object ? fullSong : [fullSong]);
       const rows = select.includes("body") ? searchPage : listPage;

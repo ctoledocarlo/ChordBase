@@ -52,3 +52,41 @@ export function useStoredFlag(key: string, fallback: boolean, clientFallback?: (
 
   return [value, set];
 }
+
+/** A short piece of text remembered on this device (which instrument view this screen is on, for one setlist). */
+export function useStoredText(key: string, fallback = ""): [string, (value: string) => void] {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      const onStorage = (e: StorageEvent) => {
+        if (e.key === key || e.key === null) onChange();
+      };
+      window.addEventListener("storage", onStorage);
+      window.addEventListener(CHANGED, onChange);
+      return () => {
+        window.removeEventListener("storage", onStorage);
+        window.removeEventListener(CHANGED, onChange);
+      };
+    },
+    [key],
+  );
+  const read = useCallback(() => {
+    try {
+      return localStorage.getItem(key) ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }, [key, fallback]);
+  const value = useSyncExternalStore(subscribe, read, () => fallback);
+  const set = useCallback(
+    (next: string) => {
+      try {
+        localStorage.setItem(key, next);
+      } catch {
+        // Not remembered, but still applied for now by the event below.
+      }
+      window.dispatchEvent(new Event(CHANGED));
+    },
+    [key],
+  );
+  return [value, set];
+}

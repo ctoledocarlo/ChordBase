@@ -7,12 +7,29 @@ import type { PresetSettings } from "@/lib/songs";
 import { PreviewTab } from "./editor-preview";
 import { LiveFrame, useLiveMode } from "./live-mode";
 import { SidebarPortal } from "./sidebar-portal";
+import type { Singer } from "@/lib/setlist-team";
+import type { SongLink } from "@/lib/song-links";
+import { KeyForSinger } from "./singers";
+import { SongLinkList, SongTags } from "./song-extras";
 import { SCREEN_HEIGHT } from "./song-editor-shared";
 import { SongToolbar } from "./song-toolbar";
 import { MinusIcon, PlusIcon } from "./icons";
-import { SongSettingsPanel, deriveSong, useSongSections } from "./song-settings";
+import { Group, SongSettingsPanel, deriveSong, useSongSections } from "./song-settings";
+
+/** The team tools beside a song: tags, links, a key for each singer, and how often it has been played. */
+export type SongTeam = {
+  songId: string;
+  tags: string[];
+  links: SongLink[];
+  melodyLow: string;
+  melodyHigh: string;
+  singers: Singer[];
+  /** "Played 5 times, last 3 weeks ago", or similar, worked out on the server. */
+  played: string;
+};
 
 type Props = {
+  team?: SongTeam;
   title: string;
   tempo: number | null;
   originalKey: string;
@@ -26,9 +43,11 @@ type Props = {
 };
 
 /** One song, laid out like the editor's Preview tab, with its settings in the sidebar. */
-export function SongView({ title, tempo, originalKey, defaultCapo, body, editHref, actions, barAction }: Props) {
+export function SongView({ team, title, tempo, originalKey, defaultCapo, body, editHref, actions, barAction }: Props) {
   const [settings, setSettings] = useState<PresetSettings>(() => defaultSettings(defaultCapo));
   const [live, setLive] = useLiveMode();
+  const [singers, setSingers] = useState(team?.singers ?? []);
+  const [singerId, setSingerId] = useState<string | null>(null);
 
   const { keyLabel, soundingKey, hasKey } = deriveSong(originalKey, settings);
   const stepKey = (delta: number) => setSettings((s) => ({ ...s, semitones: (s.semitones + delta + 12) % 12 }));
@@ -50,6 +69,38 @@ export function SongView({ title, tempo, originalKey, defaultCapo, body, editHre
         <div data-tour="song-settings" className="space-y-6">
           <SongSettingsPanel originalKey={originalKey} defaultCapo={defaultCapo} settings={settings} onChange={setSettings} />
         </div>
+        {team && (
+          <>
+            <Group title="Key for a singer">
+              <KeyForSinger
+                originalKey={originalKey}
+                melodyLow={team.melodyLow}
+                melodyHigh={team.melodyHigh}
+                singers={singers}
+                onSingers={setSingers}
+                singerId={singerId}
+                onSinger={setSingerId}
+                settings={settings}
+                onChange={setSettings}
+                editHref={editHref}
+              />
+            </Group>
+            {team.links.length > 0 && (
+              <Group title="Links">
+                <SongLinkList links={team.links} />
+              </Group>
+            )}
+            <Group title="Tags">
+              <SongTags songId={team.songId} initial={team.tags} />
+            </Group>
+            <div className="space-y-2 text-sm">
+              <p className="text-muted">{team.played}</p>
+              <Link data-tour="song-print" href={`/songs/${team.songId}/print`} className="btn w-full">
+                Print or save as PDF
+              </Link>
+            </div>
+          </>
+        )}
         {actions && <div className="border-t border-line pt-5">{actions}</div>}
       </SidebarPortal>
       <div className={live ? "" : "pb-20 lg:pb-0"}>

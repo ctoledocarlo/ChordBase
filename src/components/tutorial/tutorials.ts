@@ -50,6 +50,7 @@ export function pageKeyFor(pathname: string): PageKey | null {
   if (pathname === "/") return "songs";
   if (pathname === "/songs/import") return "import";
   if (pathname === "/songs/new" || /^\/songs\/[^/]+\/edit$/.test(pathname)) return "editor";
+  if (pathname === "/songs/history" || pathname === "/songs/cleanup") return null;
   if (/^\/songs\/[^/]+$/.test(pathname)) return "song";
   if (pathname === "/setlists") return "setlists";
   if (/^\/setlists\/[^/]+$/.test(pathname)) return "setlist";
@@ -186,6 +187,12 @@ const PAGES: Tutorial[] = [
         optional: true,
       },
       {
+        target: "songs-tools",
+        title: "History and tidying up",
+        body: "“Service history” shows which songs you have used, which are used a lot and which haven't been played in a while. “Tidy up the library” finds songs that are in twice, and artists spelled in different ways, and lets you merge them.",
+        optional: true,
+      },
+      {
         target: "songs-buttons",
         title: "Add songs",
         body: "“Add song” opens the editor to type one in. “Import” reads PowerPoint files, hundreds at a time. Both have their own guides in the Tutorial menu.",
@@ -226,6 +233,34 @@ const PAGES: Tutorial[] = [
         sidebar: true,
         title: "Edit song",
         body: "Opens the editor to change the words, chords or details of the song for good.",
+      },
+      {
+        target: "singer-key",
+        sidebar: true,
+        title: "A key for a singer",
+        body: "Choose a singer and ChordBase suggests the keys that keep the whole melody inside their range. You add singers (and their lowest and highest notes) here, and the song's melody range in the editor.",
+        optional: true,
+      },
+      {
+        target: "song-tags",
+        sidebar: true,
+        title: "Tags",
+        body: "Add tags like “Easter” or “communion” to group songs. Press a tag to see every song with it, or use the Tags filter on the Songs page.",
+        optional: true,
+      },
+      {
+        target: "song-links",
+        sidebar: true,
+        title: "Links",
+        body: "Recordings, videos and charts kept with the song open in a new tab. Add them in the editor.",
+        optional: true,
+      },
+      {
+        target: "song-print",
+        sidebar: true,
+        title: "Print or save as PDF",
+        body: "Makes a clean chord sheet in the key you choose, with or without chords, in one or two columns.",
+        optional: true,
       },
       {
         target: "song-add-setlist",
@@ -337,6 +372,34 @@ const PAGES: Tutorial[] = [
         rail: true,
         title: "Metronome",
         body: "Starts at the tempo of the song you're looking at. A row of dots lights up on every beat (orange on beat one), so the band can count in without any noise. Press the play button, nudge the tempo with − and +, and open “More” for tap tempo and an optional click sound.",
+        optional: true,
+      },
+      {
+        target: "setlist-singer",
+        sidebar: true,
+        title: "Who sings it",
+        body: "Choose a singer for this song and the keys that suit their range appear. Press one to use it.",
+        optional: true,
+      },
+      {
+        target: "setlist-notes",
+        sidebar: true,
+        title: "Notes for the band",
+        body: "Write what each part needs to know for this song (“drums in at the chorus”). Everyone sees the shared notes; each instrument sees its own. The guide “Notes, parts and the checklist” explains more.",
+        optional: true,
+      },
+      {
+        target: "setlist-checklist",
+        sidebar: true,
+        title: "Before the service",
+        body: "A checklist for the team: sound check, tuning, slides. Items can be for everyone or for one instrument, and each person ticks their own.",
+        optional: true,
+      },
+      {
+        target: "setlist-share",
+        sidebar: true,
+        title: "Share, print and keep offline",
+        body: "Open the phone remote, print or save the setlist as a PDF, add the service to the history, or keep this setlist for offline use on this device.",
         optional: true,
       },
       {
@@ -503,6 +566,50 @@ const FUNCTIONS: Tutorial[] = [
         rail: true,
         title: "Who's connected",
         body: "The line at the top of this panel shows whether you're connected and how many screens of each kind are watching.",
+        optional: true,
+      },
+    ],
+  },
+  {
+    id: "fn-team",
+    kind: "function",
+    title: "Notes, parts and the checklist",
+    summary: "A view for each instrument, notes per song, and a pre-service checklist",
+    pages: ["setlist"],
+    steps: [
+      {
+        title: "What it is for",
+        body: "Each instrument can have its own view of a setlist: its own notes for every song, and its own jobs to tick off before the service. Nothing here changes the songs in your library.",
+      },
+      {
+        target: "setlist-views",
+        sidebar: true,
+        title: "1. Add the instruments",
+        body: "Add a view for each instrument in your band, or your own (“Cello”). Turn Chords off for a view that doesn't read them, like drums.",
+      },
+      {
+        target: "setlist-notes",
+        sidebar: true,
+        title: "2. Write notes",
+        body: "Pick who the note is for (everyone or one instrument) and type it. It is saved as you type and appears on that instrument's Stage screens.",
+      },
+      {
+        target: "stage-part",
+        title: "3. On a Stage screen, pick the part",
+        body: "On a Stage or Viewer screen, choose which part it is for. That screen then shows the everyone notes and that part's notes above the song, and hides the chords if that view has them off.",
+        optional: true,
+      },
+      {
+        target: "setlist-checklist",
+        sidebar: true,
+        title: "4. The checklist",
+        body: "Add things to check before the service, for everyone or for one instrument. Stage screens get a Checklist button to tick their own items, and you see who ticked what.",
+      },
+      {
+        target: "service-clock",
+        rail: true,
+        title: "5. The service clock",
+        body: "Press the time to set how long the set has, or when it ends. Every screen shows a countdown that turns amber in the last five minutes.",
         optional: true,
       },
     ],

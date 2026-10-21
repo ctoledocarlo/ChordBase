@@ -2,13 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { getCurrentChurch, isSignedIn } from "@/lib/church";
 import { DEFAULT_KEEP_MONTHS, expiryFrom, isKeepMonths } from "@/lib/setlist-expiry";
-import { defaultSettings, validSettings } from "@/lib/setlist-settings";
+import { deriveSong } from "@/lib/setlist-derive";
+import { defaultSettings, normalizeSettings, validSettings } from "@/lib/setlist-settings";
+import type { TeamExtras } from "@/lib/setlist-team";
 import {
   ITEM_COLUMNS,
   MESSAGE_COLUMNS,
   getSetlist,
+  getTeamExtras,
   listMessages,
   toItem,
   type ChatMessage,
@@ -258,10 +262,10 @@ export async function saveItemBody(itemId: string, body: string | null, clientId
 /** The setlist as it is now, for a screen catching up with changes made elsewhere. Null if it is gone. */
 export async function getSetlistState(
   setlistId: string,
-): Promise<{ setlist: Setlist; items: SetlistItem[]; messages: ChatMessage[] } | null> {
+): Promise<{ setlist: Setlist; items: SetlistItem[]; messages: ChatMessage[]; extras: TeamExtras } | null> {
   if (!(await isSignedIn())) return null;
-  const [found, messages] = await Promise.all([getSetlist(setlistId), listMessages(setlistId)]);
-  return found ? { ...found, messages } : null;
+  const [found, messages, extras] = await Promise.all([getSetlist(setlistId), listMessages(setlistId), getTeamExtras(setlistId)]);
+  return found ? { ...found, messages, extras } : null;
 }
 
 const MAX_MESSAGE = 500;
@@ -299,15 +303,53 @@ export async function sendMessage(
   return { message: data };
 }
 
-/** Puts a song on stage: Stage and Viewer screens switch to it. Null clears the choice. */
-export async function setActiveItem(setlistId: string, itemId: string | null, clientId?: string): Promise<SetlistResult> {
+/**
+ * Puts a song on stage: Stage and Viewer screens switch to it. Null clears the choice. The song is also written
+ * to the permanent history (once per song per day), after the answer has gone back, so it never slows a change down.
+ * `localDay` is the day on the Media screen ("2026-10-18"), since a Sunday evening can already be Monday on the server.
+ */
+export async function setActiveItem(setlistId: string, itemId: string | null, clientId?: string, localDay?: string): Promise<SetlistResult> {
   if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   const supabase = await createClient();
   const { error } = await supabase
     .from("setlists")
     .update({ active_item_id: itemId, edited_by: screenId(clientId) })
     .eq("id", setlistId);
-  return error ? { error: "Couldn't change the song on stage." } : {};
+  if (error) return { error: "Couldn't change the song on stage." };
+  if (itemId) after(() => recordPlay(setlistId, itemId, localDay));
+  return {};
+}
+
+/** The day to file a play under: the Media screen's own day when it is believable, else today's date on the server. */
+function playDay(localDay: string | undefined): string {
+  const today = new Date().toISOString().slice(0, 10);
+  if (!localDay || !/^\d{4}-\d{2}-\d{2}$/.test(localDay)) return today;
+  const apart = Math.abs(Date.parse(localDay) - Date.parse(today)) / 86_400_000;
+  return apart <= 2 ? localDay : today;
+}
+
+async function recordPlay(setlistId: string, itemId: string, localDay: string | undefined) {
+  try {
+    const supabase = await createClient();
+    const [{ data: setlist }, { data: item }] = await Promise.all([
+      supabase.from("setlists").select("name").eq("id", setlistId).maybeSingle<{ name: string }>(),
+      supabase
+        .from("setlist_items")
+        .select("song_id, settings, songs(original_key, default_capo)")
+        .eq("id", itemId)
+        .eq("setlist_id", setlistId)
+        .maybeSingle(),
+    ]);
+    const row = item as unknown as { song_id: string; settings: unknown; songs: { original_key: string; default_capo: number } | null } | null;
+    if (!setlist || !row || !row.songs) return;
+    const key = deriveSong(row.songs.original_key, normalizeSettings(row.settings, row.songs.default_capo)).soundingKey;
+    // church_id comes from the column default; a second play of the same song on the same day changes nothing.
+    await supabase
+      .from("song_history")
+      .upsert({ song_id: row.song_id, played_on: playDay(localDay), setlist_name: setlist.name, key }, { onConflict: "song_id,played_on", ignoreDuplicates: true });
+  } catch (e) {
+    console.error("recordPlay failed", e);
+  }
 }
 
 /** Saves how one song leads into the next: suggested chords, typed-in chords, or none. */

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { EditorSection } from "@/lib/chords";
+import { RANGE_NOTES } from "@/lib/key-finder";
+import { EditorLinks, type LinkDraft } from "./editor-links";
 import { ArrowDownIcon, ArrowUpIcon, ChevronIcon, CopyIcon, PlusIcon, TrashIcon } from "./icons";
 import { Modal } from "./modal";
 import { KEYS, PART_PRESETS, TIME_SIGNATURES, type SongInfo } from "./song-editor-shared";
@@ -26,6 +28,8 @@ type Props = {
   titleMissing: boolean;
   infoOpen: boolean;
   onInfoOpen: (open: boolean) => void;
+  links: LinkDraft[];
+  onLinks: (links: LinkDraft[]) => void;
 };
 
 export function LyricsTab(p: Props) {
@@ -129,6 +133,43 @@ export function LyricsTab(p: Props) {
               ))}
             </select>
           </label>
+          <label className="block sm:col-span-2">
+            <span className="label">Tags (separate with commas)</span>
+            <input
+              value={info.tags}
+              onChange={(e) => onInfo({ tags: e.target.value })}
+              placeholder="Easter, communion, slow"
+              className="field"
+              autoComplete="off"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-4 sm:col-span-2">
+            <label className="block">
+              <span className="label">Melody: lowest note</span>
+              <select value={info.melodyLow} onChange={(e) => onInfo({ melodyLow: e.target.value })} className="field">
+                <option value="">Not set</option>
+                {RANGE_NOTES.map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="label">Melody: highest note</span>
+              <select value={info.melodyHigh} onChange={(e) => onInfo({ melodyHigh: e.target.value })} className="field">
+                <option value="">Not set</option>
+                {RANGE_NOTES.map((n) => (
+                  <option key={n}>{n}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="text-sm text-muted sm:col-span-2 lg:col-span-4">
+            The melody&apos;s lowest and highest notes, in the song&apos;s usual key (C4 is middle C). With these, ChordBase can suggest a key each singer can sing.
+          </p>
+          <div className="sm:col-span-2 lg:col-span-4">
+            <span className="label">Links</span>
+            <EditorLinks links={p.links} onChange={p.onLinks} />
+          </div>
         </div>
       </section>
 

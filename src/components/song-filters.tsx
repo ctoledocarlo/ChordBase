@@ -151,6 +151,21 @@ export function SongFilterPanel({ filters, facets }: { filters: SongFilters; fac
           </div>
         </Group>
 
+        {facets.tags.length > 0 && (
+          <Group title="Tags">
+            <div className="flex flex-wrap gap-1.5">
+              {facets.tags.map((t) => (
+                <label key={t} className="cursor-pointer">
+                  <input type="checkbox" name="tag" value={t} defaultChecked={filters.tags.includes(t)} className="peer sr-only" />
+                  <span className="inline-block rounded-full border border-line px-2.5 py-1 text-xs peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent hover:bg-hover peer-checked:hover:bg-foreground">
+                    #{t}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </Group>
+        )}
+
         {facets.timeSignatures.length > 1 && (
           <Group title="Time signature">
             <select name="ts" defaultValue={filters.timeSig} className="field field-sm">

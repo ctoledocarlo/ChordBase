@@ -1,5 +1,6 @@
 "use client";
 
+import type { SetlistView } from "@/lib/setlist-team";
 import { ROLES, type ScreenRole } from "./use-screen-role";
 
 /** Choose what this screen is: Stage, Media or Viewer. */
@@ -37,6 +38,12 @@ export function CornerMenu({
   autoHide,
   onAutoHide,
   faded = false,
+  views = [],
+  viewId,
+  onView,
+  checklist = null,
+  showNotes = true,
+  onShowNotes,
 }: {
   role: ScreenRole;
   onChange: (role: ScreenRole) => void;
@@ -46,6 +53,14 @@ export function CornerMenu({
   onAutoHide: (on: boolean) => void;
   /** Fade out while the screen is idle; any touch or movement brings it back. */
   faded?: boolean;
+  /** The instrument views of this setlist: a screen picks the part it plays, to see that part's notes. */
+  views?: SetlistView[];
+  viewId?: string;
+  onView?: (id: string) => void;
+  /** The checklist button, when this screen has items to tick: how many are still open. */
+  checklist?: { left: number; onOpen: () => void } | null;
+  showNotes?: boolean;
+  onShowNotes?: (on: boolean) => void;
 }) {
   function toggleFullscreen() {
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
@@ -55,9 +70,30 @@ export function CornerMenu({
     <div
       data-no-autohide
       data-corner-menu
-      className={`fixed right-4 top-4 z-[55] flex items-center gap-2 transition-opacity duration-500 ${faded ? "pointer-events-none opacity-0" : ""}`}
+      className={`fixed right-4 top-4 z-[55] flex max-w-[calc(100vw-2rem)] flex-wrap items-center justify-end gap-2 transition-opacity duration-500 ${faded ? "pointer-events-none opacity-0" : ""}`}
     >
       <RoleSelect role={role} onChange={onChange} className="!w-auto" />
+      {views.length > 1 && onView && (
+        <select
+          data-tour="stage-part"
+          aria-label="Which part this screen is for"
+          title="Which part this screen is for: you see that part's notes"
+          value={viewId ?? ""}
+          onChange={(e) => onView(e.target.value)}
+          className="field field-sm !w-auto"
+        >
+          {views.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.kind === "all" ? "All parts" : v.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {checklist && (
+        <button type="button" className="btn" onClick={checklist.onOpen}>
+          Checklist{checklist.left > 0 ? ` (${checklist.left})` : " ✓"}
+        </button>
+      )}
       <button type="button" className="btn" onClick={toggleFullscreen}>
         Full screen
       </button>
@@ -71,6 +107,15 @@ export function CornerMenu({
               <span className="block text-xs text-muted">Black background, brighter text and chords, for a dark stage.</span>
             </span>
           </label>
+          {onShowNotes && (
+            <label className="flex items-start gap-2">
+              <input type="checkbox" className="mt-1" checked={showNotes} onChange={(e) => onShowNotes(e.target.checked)} />
+              <span>
+                Show notes
+                <span className="block text-xs text-muted">The band&apos;s notes for each song, above the words.</span>
+              </span>
+            </label>
+          )}
           <label className="flex items-start gap-2">
             <input type="checkbox" className="mt-1" checked={autoHide} onChange={(e) => onAutoHide(e.target.checked)} />
             <span>

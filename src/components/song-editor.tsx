@@ -29,9 +29,11 @@ import {
 } from "@/lib/chords";
 import type { ImportedSong } from "@/lib/import/song";
 import type { ChordShortcut, Song } from "@/lib/songs";
+import { readLinks } from "@/lib/song-links";
 import { ChordsTab } from "./editor-chords";
 import { LyricsTab } from "./editor-lyrics";
 import { PreviewTab } from "./editor-preview";
+import type { LinkDraft } from "./editor-links";
 import { RedoIcon, UndoIcon } from "./icons";
 import { Modal } from "./modal";
 import { SidebarPortal } from "./sidebar-portal";
@@ -62,7 +64,7 @@ function startingSections(body: string | undefined): EditorSection[] {
 }
 
 /** The details and words as one string, to tell whether anything changed since the song was opened or saved. */
-const snapshot = (info: SongInfo, body: string) => JSON.stringify([info, body]);
+const snapshot = (info: SongInfo, body: string, links: LinkDraft[] = []) => JSON.stringify([info, body, links]);
 
 const sameTarget = (a: Target | null, b: Target) => !!a && a.sid === b.sid && a.line === b.line && a.pos === b.pos;
 
@@ -78,14 +80,17 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
     capo: String(song?.default_capo ?? 0),
     ccli: song?.ccli_number ?? "",
     tags: song?.tags.join(", ") ?? "",
+    melodyLow: song?.melody_low ?? "",
+    melodyHigh: song?.melody_high ?? "",
   });
+  const [links, setLinks] = useState<LinkDraft[]>(() => (song ? readLinks(song.links).map(({ label, url, kind }) => ({ label, url, kind })) : []));
   const [history, setHistory] = useState<History>(() => ({
     past: [],
     present: startingSections(song?.body),
     future: [],
   }));
   // What the song looked like when the editor opened; anything different is an unsaved change.
-  const [baseline] = useState(() => snapshot(info, serializeSections(history.present)));
+  const [baseline] = useState(() => snapshot(info, serializeSections(history.present), links));
   // Where the person was heading when we stopped them to ask about unsaved changes.
   const [leaving, setLeaving] = useState<{ href: string; back: boolean } | null>(null);
   const router = useRouter();
@@ -115,7 +120,7 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
   const invalid = used.filter((c) => !isValidChord(c));
   const titleMissing = info.title.trim() === "";
   const columnCount = columnsOf(sections).length;
-  const dirty = snapshot(info, body) !== baseline;
+  const dirty = snapshot(info, body, links) !== baseline;
   // While saving, the page is about to move on by itself, so don't stop it.
   const guarding = dirty && !pending;
 
@@ -435,6 +440,9 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
       <input type="hidden" name="default_capo" value={info.capo} />
       <input type="hidden" name="ccli_number" value={info.ccli} />
       <input type="hidden" name="tags" value={info.tags} />
+      <input type="hidden" name="melody_low" value={info.melodyLow} />
+      <input type="hidden" name="melody_high" value={info.melodyHigh} />
+      <input type="hidden" name="links" value={JSON.stringify(links)} />
       <input type="hidden" name="body" value={body} />
 
       <div data-tour="editor-screen">
@@ -457,6 +465,8 @@ export function SongEditor({ song, shortcuts: initialShortcuts }: { song?: Song;
           titleMissing={tried && titleMissing}
           infoOpen={infoOpen}
           onInfoOpen={setInfoOpen}
+          links={links}
+          onLinks={setLinks}
         />
       )}
       {tab === "chords" && (

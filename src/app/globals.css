@@ -294,6 +294,31 @@ dialog[open]::backdrop {
   }
 }
 
+/* Printing a song or a setlist: just the page, in black on white, whatever the theme is. */
+@media print {
+  [data-app-chrome] {
+    display: none !important;
+  }
+  :root,
+  :root.dark {
+    --background: #ffffff;
+    --surface: #ffffff;
+    --foreground: #000000;
+    --muted: #52525b;
+    --line: #d4d4d8;
+    --hover: #ffffff;
+    --chord: #000000;
+    --accent: #52525b;
+    color-scheme: light;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .page-enter {
+    animation: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

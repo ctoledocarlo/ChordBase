@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { ChordStyle } from "./chords";
 import { lyricSnippet, normalizeText, searchTokens } from "./lyric-search";
 import { PAGE_SIZE, type SongFacets, type SongFilters } from "./song-filters";
+import { readLinks, type SongLink } from "./song-links";
 
 export type Song = {
   id: string;
@@ -15,11 +16,20 @@ export type Song = {
   time_signature: string;
   ccli_number: string;
   tags: string[];
+  /** The lowest and highest note of the melody in the song's usual key (like "A3" and "D5"), or empty. */
+  melody_low: string;
+  melody_high: string;
+  /** Raw from the database; use songLinks(song) to read it. */
+  links: unknown;
   body: string;
   updated_at: string;
 };
 
+/** A song's saved links, checked. */
+export const songLinks = (song: Pick<Song, "links">): SongLink[] => readLinks(song.links);
+
 export type SongSummary = Pick<Song, "id" | "title" | "artist" | "original_key" | "tempo"> & {
+  tags?: string[];
   /** When a search matched the words of the song (not its title or artist), the line that matched. */
   snippet?: string;
 };
@@ -36,6 +46,7 @@ type PageOptions = {
   tempoMax?: number | null;
   timeSig?: string;
   capo?: number | null;
+  tags?: string[];
   sort?: string;
   limit: number;
   offset: number;
@@ -49,7 +60,7 @@ type PageOptions = {
 async function songsPage(o: PageOptions): Promise<{ rows: PageRow[]; total: number | null }> {
   const supabase = await createClient();
   const q = (o.q ?? "").trim();
-  const { data, error } = await supabase.rpc("songs_page", {
+  const params = {
     p_q: q,
     p_tokens: q ? searchTokens(q) : [],
     p_keys: o.keys ?? [],
@@ -64,7 +75,11 @@ async function songsPage(o: PageOptions): Promise<{ rows: PageRow[]; total: numb
     p_offset: o.offset,
     p_with_body: q !== "",
     p_phrase: q ? normalizeText(q) : "",
-  });
+  };
+  let { data, error } = await supabase.rpc("songs_page", { ...params, p_tags: o.tags ?? [] });
+  // PGRST202: no function with the tags parameter, so the tags migration (20261028000001) hasn't been run.
+  // Search the way it used to be rather than showing an empty library.
+  if (error?.code === "PGRST202") ({ data, error } = await supabase.rpc("songs_page", params));
   if (error) console.error("songs_page failed:", error.message);
   const rows = (data as PageRow[] | null) ?? [];
   // The total comes with every row, so a page past the end (no rows) doesn't know it.
@@ -112,6 +127,7 @@ export async function searchSongs(f: SongFilters): Promise<SongPage> {
     tempoMax: f.tempoMax,
     timeSig: f.timeSig,
     capo: f.capo,
+    tags: f.tags,
     sort: f.sort,
     limit: PAGE_SIZE,
   };
@@ -160,6 +176,7 @@ export async function getSongFacets(): Promise<SongFacets> {
     artists: list<string>(raw.artists),
     timeSignatures: list<string>(raw.time_signatures),
     capos: list<number>(raw.capos),
+    tags: list<string>(raw.tags),
   };
   if (user) {
     if (facetCache.size > 200) facetCache.clear();

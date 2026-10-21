@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { isValidChord } from "@/lib/chords";
 import { getCurrentChurch, isSignedIn } from "@/lib/church";
+import { noteNumber } from "@/lib/key-finder";
+import { normalizeLinks } from "@/lib/song-links";
+import { parseTagText } from "@/lib/tags";
 import { createClient } from "@/lib/supabase/server";
 import { findSongs as findSongsInLibrary, forgetSongFacets, getSong, type PresetSettings, type SongSummary } from "@/lib/songs";
 
@@ -45,6 +48,23 @@ export async function saveSong(
     return { error: "Time signature should look like 4/4 or 6/8." };
   }
 
+  const melodyLow = text(formData, "melody_low").trim();
+  const melodyHigh = text(formData, "melody_high").trim();
+  for (const note of [melodyLow, melodyHigh]) {
+    if (note !== "" && noteNumber(note) === null) return { error: "The melody's lowest and highest notes should look like A3 or D5." };
+  }
+  if (melodyLow !== "" && melodyHigh !== "" && noteNumber(melodyHigh)! < noteNumber(melodyLow)!) {
+    return { error: "The melody's highest note has to be above its lowest." };
+  }
+  let linksInput: unknown = [];
+  try {
+    linksInput = JSON.parse(text(formData, "links") || "[]");
+  } catch {
+    return { error: "The links weren't in the right form." };
+  }
+  const { links, error: linksError } = normalizeLinks(linksInput);
+  if (linksError) return { error: linksError };
+
   const body = text(formData, "body").replace(/\r\n?/g, "\n");
   const badChords = [
     ...new Set([...body.matchAll(/\[([^\]]*)\]/g)].map((m) => m[1].trim()).filter((c) => !isValidChord(c))),
@@ -61,24 +81,35 @@ export async function saveSong(
     tempo,
     time_signature: timeSignature,
     ccli_number: text(formData, "ccli_number").trim(),
-    tags: text(formData, "tags")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean),
+    tags: parseTagText(text(formData, "tags")),
+    melody_low: melodyLow,
+    melody_high: melodyHigh,
+    links,
     body,
   };
 
   const supabase = await createClient();
+  // Songs saved before the team-tools migration was run have no melody or links columns; save the rest
+  // rather than refusing, and say so.
+  const { melody_low, melody_high, links: newLinks, ...older } = fields;
+  void melody_low;
+  void melody_high;
+  void newLinks;
+  const missingColumn = (e: { code?: string } | null) => e?.code === "42703" || e?.code === "PGRST204";
   let songId = id;
   if (id) {
-    const { error } = await supabase.from("songs").update(fields).eq("id", id);
+    let { error } = await supabase.from("songs").update(fields).eq("id", id);
+    if (missingColumn(error)) ({ error } = await supabase.from("songs").update(older).eq("id", id));
     if (error) return { error: "Couldn't save the song. Please try again." };
   } else {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("songs")
       .insert({ ...fields, church_id: church.id })
       .select("id")
       .single<{ id: string }>();
+    if (missingColumn(error)) {
+      ({ data, error } = await supabase.from("songs").insert({ ...older, church_id: church.id }).select("id").single<{ id: string }>());
+    }
     if (error || !data) return { error: "Couldn't save the song. Please try again." };
     songId = data.id;
   }

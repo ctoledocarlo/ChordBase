@@ -22,6 +22,8 @@ export type SongFilters = {
   tempoMax: number | null;
   timeSig: string;
   capo: number | null;
+  /** Only songs that have every one of these tags (collections like "Easter"). */
+  tags: string[];
   sort: SongSort;
   page: number;
 };
@@ -56,6 +58,7 @@ export function parseSongFilters(raw: Raw): SongFilters {
     tempoMax,
     timeSig: /^\d{1,2}\/\d{1,2}$/.test(first(raw.ts)) ? first(raw.ts) : "",
     capo: intIn(first(raw.capo), 0, 12),
+    tags: [...new Set(all(raw.tag).map((t) => t.trim()).filter((t) => t !== "" && t.length <= 40))].slice(0, 10),
     // "Best match" means nothing without a search, so it falls back to title.
     sort: SORTS.some((s) => s.value === sort) && !(sort === "relevance" && q === "") ? (sort as SongSort) : defaultSort(q),
     page: intIn(first(raw.page), 1, 100000) ?? 1,
@@ -73,6 +76,7 @@ export function filtersToParams(f: SongFilters, page = f.page): URLSearchParams 
   if (f.tempoMax !== null) p.set("tempo_max", String(f.tempoMax));
   if (f.timeSig) p.set("ts", f.timeSig);
   if (f.capo !== null) p.set("capo", String(f.capo));
+  for (const t of f.tags) p.append("tag", t);
   if (f.sort !== defaultSort(f.q)) p.set("sort", f.sort);
   if (page > 1) p.set("page", String(page));
   return p;
@@ -86,7 +90,8 @@ export function activeFilterCount(f: SongFilters): number {
     (f.mode ? 1 : 0) +
     (f.tempoMin !== null || f.tempoMax !== null ? 1 : 0) +
     (f.timeSig ? 1 : 0) +
-    (f.capo !== null ? 1 : 0)
+    (f.capo !== null ? 1 : 0) +
+    (f.tags.length > 0 ? 1 : 0)
   );
 }
 
@@ -97,6 +102,7 @@ export type FilterChip = { id: string; label: string; without: SongFilters };
 export function filterChips(f: SongFilters): FilterChip[] {
   const chips: FilterChip[] = [];
   for (const k of f.keys) chips.push({ id: `key:${k}`, label: `Key ${k}`, without: { ...f, keys: f.keys.filter((x) => x !== k) } });
+  for (const t of f.tags) chips.push({ id: `tag:${t}`, label: `#${t}`, without: { ...f, tags: f.tags.filter((x) => x !== t) } });
   if (f.mode) chips.push({ id: "mode", label: f.mode === "major" ? "Major keys" : "Minor keys", without: { ...f, mode: "" } });
   if (f.artist) chips.push({ id: "artist", label: f.artist, without: { ...f, artist: "" } });
   if (f.tempoMin !== null || f.tempoMax !== null) {
@@ -130,4 +136,6 @@ export type SongFacets = {
   artists: string[];
   timeSignatures: string[];
   capos: number[];
+  /** Every tag in use, for the tag filter. */
+  tags: string[];
 };

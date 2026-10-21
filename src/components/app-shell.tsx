@@ -7,6 +7,7 @@ import { BackLink } from "./back-link";
 import { CloseIcon, MenuIcon } from "./icons";
 import { KeyboardShortcuts } from "./keyboard-shortcuts";
 import { Logo } from "./logo";
+import { OfflineSupport } from "./offline-support";
 import { OPEN_SIDEBAR_EVENT, SIDEBAR_SLOT_ID } from "./sidebar-portal";
 import {
   SIDEBAR_DEFAULT,
@@ -73,7 +74,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
       Skip to content
     </a>
     <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-20 border-b border-line bg-background">
+      <header data-app-chrome className="sticky top-0 z-20 border-b border-line bg-background">
         <div className="flex h-14 items-stretch gap-3 px-3 sm:gap-6 sm:px-4 lg:px-6">
           <Link href="/" aria-label="ChordBase, home" className="flex items-center text-base font-semibold tracking-tight">
             <Logo size={26} iconOnlyOnPhone />
@@ -92,6 +93,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
           </div>
         </div>
       </header>
+      <OfflineSupport />
 
       <div className="flex flex-1 flex-col lg:flex-row">
         <Suspense fallback={null}>
@@ -102,6 +104,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
 
           <aside
             aria-label="Page options"
+            data-app-chrome
             data-tour="sidebar"
             style={{ "--sidebar-w": `${width}px` } as CSSProperties}
             className={`fixed inset-y-0 left-0 z-40 w-[min(20rem,85vw)] border-r border-line bg-background transition-transform lg:sticky lg:top-14 lg:z-auto lg:h-[calc(100vh-3.5rem)] lg:w-[var(--sidebar-w)] lg:shrink-0 lg:translate-x-0 lg:transition-none ${
@@ -164,7 +167,7 @@ function PageOptionsBar({ onOpen }: { onOpen: () => void }) {
   const pathname = usePathname();
   if (pathname === "/") return null;
   return (
-    <div className="border-b border-line px-3 py-1.5 sm:px-4 lg:hidden">
+    <div data-app-chrome className="border-b border-line px-3 py-1.5 sm:px-4 lg:hidden">
       <button type="button" onClick={onOpen} className="btn">
         <MenuIcon /> {pathname.startsWith("/practice") ? "Lessons" : "Page options"}
       </button>

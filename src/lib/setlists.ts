@@ -2,6 +2,17 @@ import { createClient } from "@/lib/supabase/server";
 import { setlistMatches } from "./setlist-search";
 import { normalizeSettings } from "./setlist-settings";
 import { DEFAULT_TRANSITION, isTransitionMode, type Transition } from "./setlist-transition";
+import {
+  NOTE_COLUMNS,
+  SINGER_COLUMNS,
+  TASK_COLUMNS,
+  VIEW_COLUMNS,
+  type SetlistNote,
+  type SetlistTask,
+  type SetlistView,
+  type Singer,
+  type TeamExtras,
+} from "./setlist-team";
 import type { PresetSettings } from "./songs";
 
 export type Setlist = {
@@ -11,15 +22,21 @@ export type Setlist = {
   expires_at: string;
   /** The song on stage right now (Media screens choose it; Stage and Viewer follow). Null = nothing chosen yet. */
   active_item_id: string | null;
+  /** When the set should end, shared by every screen (null = no timer). */
+  timer_ends_at: string | null;
 };
 
-export type SetlistSummary = Omit<Setlist, "active_item_id"> & { songCount: number };
+export type SetlistSummary = Omit<Setlist, "active_item_id" | "timer_ends_at"> & { songCount: number };
 
 /** The song as it needs to be shown during the service. */
 export type SetlistSong = {
   title: string;
   artist: string;
   original_key: string;
+  /** The melody's lowest and highest note in the usual key, for finding a singer's key. */
+  melody_low?: string;
+  melody_high?: string;
+  links?: unknown;
   default_capo: number;
   tempo: number | null;
   time_signature?: string;
@@ -35,12 +52,14 @@ export type SetlistItem = {
   body_override: string | null;
   /** How this song leads into the next one in the setlist. */
   transition: Transition;
+  /** Who sings it (a singer's id), or null. */
+  singer_id?: string | null;
   song: SetlistSong;
 };
 
 /** Columns to select for an item together with its song. */
 export const ITEM_COLUMNS =
-  "id, song_id, position, settings, body_override, transition_mode, transition_chords, songs(title, artist, original_key, default_capo, tempo, time_signature, body)";
+  "id, song_id, position, settings, body_override, transition_mode, transition_chords, singer_id, songs(title, artist, original_key, melody_low, melody_high, links, default_capo, tempo, time_signature, body)";
 
 type ItemRow = {
   id: string;
@@ -49,6 +68,7 @@ type ItemRow = {
   body_override: string | null;
   transition_mode?: string | null;
   transition_chords?: string | null;
+  singer_id?: string | null;
   songs: SetlistSong | null;
 };
 
@@ -63,6 +83,7 @@ export function toItem(row: ItemRow): SetlistItem | null {
       mode: isTransitionMode(row.transition_mode) ? row.transition_mode : DEFAULT_TRANSITION.mode,
       chords: row.transition_chords ?? "",
     },
+    singer_id: row.singer_id ?? null,
     song: row.songs,
   };
 }
@@ -144,23 +165,39 @@ export async function listSetlistChoices(): Promise<Pick<Setlist, "id" | "name" 
   return (data as Pick<Setlist, "id" | "name" | "service_date">[] | null) ?? [];
 }
 
+/** What a setlist and its songs were made of before the team-tools update, for a database that hasn't had it yet. */
+const LEGACY_SETLIST_COLUMNS = "id, name, service_date, expires_at, active_item_id";
+const LEGACY_ITEM_COLUMNS =
+  "id, song_id, position, settings, body_override, transition_mode, transition_chords, songs(title, artist, original_key, default_capo, tempo, time_signature, body)";
+
 export async function getSetlist(id: string): Promise<{ setlist: Setlist; items: SetlistItem[] } | null> {
   const supabase = await createClient();
-  // The setlist and its songs are read together; the songs of a setlist that turns out not to exist are simply dropped.
-  const [{ data: setlist }, { data }] = await Promise.all([
-    supabase
-      .from("setlists")
-      .select("id, name, service_date, expires_at, active_item_id")
-      .eq("id", id)
-      .gt("expires_at", new Date().toISOString())
-      .maybeSingle<Setlist>(),
-    supabase
-      .from("setlist_items")
-      .select(ITEM_COLUMNS)
-      .eq("setlist_id", id)
-      .order("position", { ascending: true })
-      .order("created_at", { ascending: true }),
-  ]);
+  const read = (setlistColumns: string, itemColumns: string) =>
+    // The setlist and its songs are read together; the songs of a setlist that turns out not to exist are simply dropped.
+    Promise.all([
+      supabase
+        .from("setlists")
+        .select(setlistColumns)
+        .eq("id", id)
+        .gt("expires_at", new Date().toISOString())
+        .maybeSingle<Setlist>(),
+      supabase
+        .from("setlist_items")
+        .select(itemColumns)
+        .eq("setlist_id", id)
+        .order("position", { ascending: true })
+        .order("created_at", { ascending: true }),
+    ]);
+  const first = await read("id, name, service_date, expires_at, active_item_id, timer_ends_at", ITEM_COLUMNS);
+  let setlist = first[0].data;
+  let data = first[1].data;
+  // 42703 is "no such column": the team-tools migration hasn't been run, so read it the way it used to be.
+  if (first[0].error?.code === "42703" || first[1].error?.code === "42703") {
+    console.error("The team-tools migration (20261028000000) hasn't been run: reading the setlist without it.");
+    const legacy = await read(LEGACY_SETLIST_COLUMNS, LEGACY_ITEM_COLUMNS);
+    setlist = legacy[0].data;
+    data = legacy[1].data;
+  }
   if (!setlist) return null;
 
   const items = ((data as unknown as ItemRow[] | null) ?? []).map(toItem).filter((i): i is SetlistItem => i !== null);
@@ -191,4 +228,43 @@ export async function listMessages(setlistId: string): Promise<ChatMessage[]> {
     .order("created_at", { ascending: false })
     .limit(CHAT_HISTORY);
   return ((data as ChatMessage[] | null) ?? []).reverse();
+}
+
+/**
+ * The views, notes and checklist of a setlist. A setlist always has the shared "Everyone" view: it is made the
+ * first time anything asks (two screens asking at once is fine, the database only allows one).
+ */
+export async function getTeamExtras(setlistId: string): Promise<TeamExtras> {
+  const supabase = await createClient();
+  const read = () =>
+    Promise.all([
+      supabase.from("setlist_views").select(VIEW_COLUMNS).eq("setlist_id", setlistId).order("position", { ascending: true }).order("created_at", { ascending: true }),
+      supabase.from("setlist_notes").select(NOTE_COLUMNS).eq("setlist_id", setlistId),
+      supabase.from("setlist_tasks").select(TASK_COLUMNS).eq("setlist_id", setlistId).order("position", { ascending: true }).order("created_at", { ascending: true }),
+    ]);
+  let [views, notes, tasks] = await read();
+  if (views.error) {
+    // The team tables aren't there yet (the migration hasn't been run): the setlist still works without them.
+    console.error("getTeamExtras failed:", views.error.message);
+    return { views: [], notes: [], tasks: [] };
+  }
+  if (!((views.data as SetlistView[] | null) ?? []).some((v) => v.kind === "all")) {
+    const { error } = await supabase.from("setlist_views").insert({ setlist_id: setlistId, name: "Everyone", kind: "all", position: 0 });
+    // 23505 means another screen made it a moment ago, which is just as good.
+    if (error && error.code !== "23505") console.error("making the Everyone view failed:", error.message);
+    [views, notes, tasks] = await read();
+  }
+  return {
+    views: (views.data as SetlistView[] | null) ?? [],
+    notes: (notes.data as SetlistNote[] | null) ?? [],
+    tasks: (tasks.data as SetlistTask[] | null) ?? [],
+  };
+}
+
+/** The church's singers, by name. Empty if the singers table isn't there yet. */
+export async function listSingers(): Promise<Singer[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("singers").select(SINGER_COLUMNS).order("name", { ascending: true });
+  if (error) console.error("listSingers failed:", error.message);
+  return (data as Singer[] | null) ?? [];
 }

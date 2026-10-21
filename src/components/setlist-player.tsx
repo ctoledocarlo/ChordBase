@@ -16,7 +16,10 @@ import {
   setActiveItem,
   updateSetlist,
 } from "@/app/(app)/setlists/actions";
+import { addServiceToHistory, setItemSinger, setServiceTimer } from "@/app/(app)/setlists/team-actions";
 import { KEEP_OPTIONS, formatDay } from "@/lib/setlist-expiry";
+import { taskProgress, tasksFor, type Singer, type TeamExtras } from "@/lib/setlist-team";
+import { readLinks } from "@/lib/song-links";
 import { FIT } from "@/lib/setlist-settings";
 import { findSongs } from "@/app/(app)/songs/actions";
 import { effectiveBody } from "@/lib/setlist-body";
@@ -25,6 +28,14 @@ import type { Transition } from "@/lib/setlist-transition";
 import type { ChatMessage, Setlist, SetlistItem } from "@/lib/setlists";
 import type { ChordShortcut, PresetSettings } from "@/lib/songs";
 import { DeleteButton } from "./delete-button";
+import { Fold } from "./fold";
+import { KeyForSinger } from "./singers";
+import { keepForOffline } from "./offline-support";
+import { ServiceClock } from "./service-clock";
+import { SongLinkList } from "./song-extras";
+import { Checklist } from "./team-checklist";
+import { NotesCard, NotesEditor, ViewManager } from "./team-notes";
+import { useTeam } from "./use-team";
 import { PreviewTab } from "./editor-preview";
 import { KeyChords } from "./key-chords";
 import { LiveControls } from "./live-controls";
@@ -51,8 +62,16 @@ import { newScreenId, useSetlistSync } from "./use-setlist-sync";
 const SAVE_DELAY_MS = 500;
 /** How long a removed song can be brought back with Undo before it is really deleted. */
 const UNDO_MS = 6000;
+/** How soon to try again after a save failed for want of a connection. */
+const RETRY_MS = 10_000;
 /** The height of the setlist sheet on a phone when it is pulled down to just its bar, in pixels. */
 const SHEET_PEEK = 56;
+
+/** Today on this device, as "2026-10-18". */
+function localDay(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 /** The list with `item` back at `index` (or the end, if the list got shorter). */
 function insertAt(list: SetlistItem[], item: SetlistItem, index: number): SetlistItem[] {
@@ -69,11 +88,15 @@ export function SetlistPlayer({
   setlist,
   initialItems,
   initialMessages,
+  initialExtras,
+  initialSingers,
   shortcuts,
 }: {
   setlist: Setlist;
   initialItems: SetlistItem[];
   initialMessages: ChatMessage[];
+  initialExtras: TeamExtras;
+  initialSingers: Singer[];
   shortcuts: ChordShortcut[];
 }) {
   const [items, setItems] = useState(initialItems);
@@ -114,6 +137,12 @@ export function SetlistPlayer({
 
   // Keeping in step with other screens showing this setlist.
   const [screenId] = useState(newScreenId);
+  // The team side: instrument views, notes, the checklist, singers and the service timer.
+  const team = useTeam(setlist.id, screenId, initialExtras);
+  const [singers, setSingers] = useState(initialSingers);
+  const [timerEndsAt, setTimerEndsAt] = useState(setlist.timer_ends_at);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [showNotes, setShowNotes] = useStoredFlag("chordbase.showNotes", true);
   const [highlight, setHighlight] = useState<ReadonlySet<string>>(new Set());
   // Chords changed on another screen while they were being edited here.
   const [conflict, setConflict] = useState<SetlistItem | null>(null);
@@ -138,6 +167,8 @@ export function SetlistPlayer({
   const nextItem = current ? (items[items.findIndex((i) => i.id === current.id) + 1] ?? null) : null;
   // Stage and Viewer screens are always full screen.
   const liveView = live || !media;
+  // The checklist items this screen has to tick off.
+  const myTasks = tasksFor(team.tasks, team.views, team.myView?.id ?? null);
   // Stage and Viewer screens hide their controls after a few quiet seconds so the song has the whole screen.
   const idle = useIdle(5000, liveView && !media && autoHide);
   const hideControls = idle && !railOpen;
@@ -175,6 +206,25 @@ export function SetlistPlayer({
     dirtyRef.current = dirty;
   });
 
+  // Saves that failed for want of a connection, waiting to be tried again.
+  const retries = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const waiting = retries.current;
+    // The moment the connection returns, send everything that is waiting.
+    const sendNow = () => {
+      for (const id of [...pending.current.keys()]) void flush(id);
+      for (const id of [...bodyPending.current.keys()]) void flushBody(id);
+      for (const id of [...transPending.current.keys()]) void flushTransition(id);
+    };
+    window.addEventListener("online", sendNow);
+    return () => {
+      window.removeEventListener("online", sendNow);
+      waiting.forEach(clearTimeout);
+    };
+    // The save functions only read refs and stable setters, so the first ones are as good as any.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function tracked<T>(itemId: string, run: () => Promise<T>): Promise<T> {
     savingIds.current.set(itemId, (savingIds.current.get(itemId) ?? 0) + 1);
     try {
@@ -191,8 +241,14 @@ export function SetlistPlayer({
     if (!settings) return;
     pending.current.delete(itemId);
     timers.current.delete(itemId);
-    const res = await tracked(itemId, () => saveItemSettings(itemId, settings, screenId));
-    afterSave(res.error);
+    try {
+      const res = await tracked(itemId, () => saveItemSettings(itemId, settings, screenId));
+      afterSave(res.error);
+    } catch {
+      // No connection: keep the change and send it when it is back.
+      if (!pending.current.has(itemId)) pending.current.set(itemId, settings);
+      tryAgainLater(`s:${itemId}`, () => void flush(itemId));
+    }
   }
 
   async function flushTransition(itemId: string) {
@@ -200,8 +256,13 @@ export function SetlistPlayer({
     if (!t) return;
     transPending.current.delete(itemId);
     transTimers.current.delete(itemId);
-    const res = await tracked(itemId, () => saveItemTransition(itemId, t.mode, t.chords, screenId));
-    afterSave(res.error);
+    try {
+      const res = await tracked(itemId, () => saveItemTransition(itemId, t.mode, t.chords, screenId));
+      afterSave(res.error);
+    } catch {
+      if (!transPending.current.has(itemId)) transPending.current.set(itemId, t);
+      tryAgainLater(`t:${itemId}`, () => void flushTransition(itemId));
+    }
   }
 
   async function flushBody(itemId: string) {
@@ -209,8 +270,26 @@ export function SetlistPlayer({
     const body = bodyPending.current.get(itemId) ?? null;
     bodyPending.current.delete(itemId);
     bodyTimers.current.delete(itemId);
-    const res = await tracked(itemId, () => saveItemBody(itemId, body, screenId));
-    afterSave(res.error);
+    try {
+      const res = await tracked(itemId, () => saveItemBody(itemId, body, screenId));
+      afterSave(res.error);
+    } catch {
+      if (!bodyPending.current.has(itemId)) bodyPending.current.set(itemId, body);
+      tryAgainLater(`b:${itemId}`, () => void flushBody(itemId));
+    }
+  }
+
+  /** A save didn't get through (no connection). Say so, and try again soon and as soon as the connection is back. */
+  function tryAgainLater(key: string, retry: () => void) {
+    setSaveNote("Offline: kept on this screen, and sent when the connection is back");
+    clearTimeout(retries.current.get(key));
+    retries.current.set(
+      key,
+      setTimeout(() => {
+        retries.current.delete(key);
+        retry();
+      }, RETRY_MS),
+    );
   }
 
   useEffect(() => {
@@ -308,9 +387,31 @@ export function SetlistPlayer({
     structuralRev.current++;
     setActiveId(id);
     setCurrentId(id);
-    const res = await setActiveItem(setlist.id, id, screenId);
+    const res = await setActiveItem(setlist.id, id, screenId, localDay());
     structuralRev.current++;
     if (res.error) setError(res.error);
+  }
+
+  /** Sets (or clears) when the set should end, for every screen. */
+  async function changeTimer(endsAt: string | null) {
+    const before = timerEndsAt;
+    setTimerEndsAt(endsAt);
+    const res = await setServiceTimer(setlist.id, endsAt, screenId);
+    if (res.error) {
+      setTimerEndsAt(before);
+      toast(res.error, { tone: "error" });
+    }
+  }
+
+  /** Who sings a song in this setlist. */
+  async function chooseSinger(itemId: string, singerId: string | null) {
+    const before = itemsRef.current;
+    setItems((list) => list.map((i) => (i.id === itemId ? { ...i, singer_id: singerId } : i)));
+    const res = await setItemSinger(itemId, singerId, screenId);
+    if (res.error) {
+      setItems(before);
+      toast(res.error, { tone: "error" });
+    }
   }
 
   /** Stage screens: look at the previous or next song, on this screen only. */
@@ -490,6 +591,8 @@ export function SetlistPlayer({
     }
 
     addMessages(state.messages);
+    team.apply(state.extras);
+    setTimerEndsAt(state.setlist.timer_ends_at);
 
     const local = itemsRef.current;
     const pendingIds = new Set([
@@ -706,8 +809,88 @@ export function SetlistPlayer({
                 <TransitionPanel from={current} to={nextItem} onChange={(t) => changeTransition(current.id, t)} />
               </div>
             )}
+            <Fold title="Who sings it" tour="setlist-singer" hint={singers.find((x) => x.id === current.singer_id)?.name}>
+              <KeyForSinger
+                originalKey={current.song.original_key}
+                melodyLow={current.song.melody_low ?? ""}
+                melodyHigh={current.song.melody_high ?? ""}
+                singers={singers}
+                onSingers={setSingers}
+                singerId={current.singer_id ?? null}
+                onSinger={(id) => void chooseSinger(current.id, id)}
+                settings={current.settings}
+                onChange={(st) => changeSettings(current.id, st)}
+                editHref={`/songs/${current.song_id}/edit`}
+              />
+            </Fold>
+            <Fold title="Notes for the band" tour="setlist-notes">
+              <NotesEditor team={team} itemId={current.id} />
+            </Fold>
+            {readLinks(current.song.links).length > 0 && (
+              <Fold title="Links for this song">
+                <SongLinkList links={readLinks(current.song.links)} />
+              </Fold>
+            )}
           </>
         )}
+
+        <Fold title="Instrument views" tour="setlist-views" hint={team.views.length > 1 ? `${team.views.length - 1} added` : undefined}>
+          <ViewManager team={team} />
+        </Fold>
+        <Fold
+          title="Before the service"
+          tour="setlist-checklist"
+          hint={team.tasks.length > 0 ? `${taskProgress(team.tasks).done}/${team.tasks.length} ready` : undefined}
+        >
+          <Checklist team={team} manage />
+        </Fold>
+        <Fold title="Share, print and history" tour="setlist-share">
+          <div className="grid gap-2">
+            <Link href={`/setlists/${setlist.id}/remote`} className="btn w-full">
+              Open the phone remote
+            </Link>
+            <button
+              type="button"
+              className="btn w-full"
+              onClick={() => {
+                const url = `${window.location.origin}/setlists/${setlist.id}/remote`;
+                void navigator.clipboard?.writeText(url).then(
+                  () => toast("Remote link copied. Open it on a phone that is signed in.", { tone: "success" }),
+                  () => toast(url),
+                );
+              }}
+            >
+              Copy the remote link
+            </button>
+            <Link href={`/setlists/${setlist.id}/print`} className="btn w-full">
+              Print or save as PDF
+            </Link>
+            <button
+              type="button"
+              className="btn w-full"
+              onClick={async () => {
+                const res = await addServiceToHistory(setlist.id, localDay());
+                toast(res.error ?? `Added ${res.added} ${res.added === 1 ? "song" : "songs"} to the service history.`, { tone: res.error ? "error" : "success" });
+              }}
+            >
+              Add this service to the history
+            </button>
+          </div>
+          <button
+            type="button"
+            className="btn w-full"
+            onClick={async () => {
+              const kept = await keepForOffline([window.location.pathname, `/setlists/${setlist.id}/remote`, `/setlists/${setlist.id}/print`, "/setlists", "/"]);
+              toast(
+                kept > 0 ? "Kept for offline use. This setlist will open on this device without a connection." : "Couldn't keep it just now. Open it once more while online and try again.",
+                { tone: kept > 0 ? "success" : "error" },
+              );
+            }}
+          >
+            Keep this setlist for offline use
+          </button>
+          <p className="text-xs text-muted">Songs are added to the history on their own when you put them on stage.</p>
+        </Fold>
 
         <div className="border-t border-line pt-5">
           <DeleteButton
@@ -744,6 +927,10 @@ export function SetlistPlayer({
         </div>
       </Modal>
 
+      <Modal open={checklistOpen} title="Before the service" onClose={() => setChecklistOpen(false)}>
+        <Checklist team={team} manage={false} />
+      </Modal>
+
       {!media && (
         <CornerMenu
           role={role}
@@ -753,12 +940,23 @@ export function SetlistPlayer({
           autoHide={autoHide}
           onAutoHide={setAutoHide}
           faded={hideControls}
+          views={team.views}
+          viewId={team.myView?.id}
+          onView={team.chooseView}
+          checklist={myTasks.length > 0 ? { left: myTasks.filter((t) => !t.done).length, onOpen: () => setChecklistOpen(true) } : null}
+          showNotes={showNotes}
+          onShowNotes={setShowNotes}
         />
       )}
 
       <LiveFrame live={liveView} onExit={() => setLive(false)} hideExit={!media} liveClassName={`pt-14 lg:pt-6 ${night && !media ? "night" : ""} ${hideControls ? "cursor-none" : ""}`}>
+        {liveView && (
+          <div className="pointer-events-none fixed bottom-16 left-1/2 z-[55] -translate-x-1/2 rounded-full border border-line bg-background/90 px-4 py-1.5 shadow-lg lg:bottom-3">
+            <ServiceClock endsAt={timerEndsAt} large />
+          </div>
+        )}
         <div className={`flex flex-col gap-4 lg:flex-row ${liveView ? "h-full" : ""}`}>
-          <div data-tour="setlist-song" className="min-h-0 min-w-0 flex-1 max-lg:pb-14">
+          <div data-tour="setlist-song" className={`min-h-0 min-w-0 flex-1 max-lg:pb-14 ${liveView && !media ? "lg:pt-8" : ""}`}>
             {media && current && editChords && !live ? (
               <>
               {conflict && conflict.id === current.id && (
@@ -790,11 +988,12 @@ export function SetlistPlayer({
                   onPut={() => void sendToStage(current.id)}
                   onGoToStage={() => stageId && setCurrentId(stageId)}
                 />
+                {(media || showNotes) && <NotesCard team={team} itemId={current.id} role={role} />}
                 {media && !liveView && (
                   <SongToolbar originalKey={current.song.original_key} settings={current.settings} onChange={(s) => changeSettings(current.id, s)} />
                 )}
                 <div className="min-h-0 flex-1">
-                  <CurrentSong item={current} />
+                  <CurrentSong item={current} hideChords={role === "stage" && team.myView?.show_chords === false} />
                 </div>
               </div>
             ) : (
@@ -857,6 +1056,8 @@ export function SetlistPlayer({
               onRemove={(id) => void remove(id)}
               live={liveView}
               onGoLive={() => setLive(true)}
+              clock={!liveView ? <ServiceClock endsAt={timerEndsAt} canSet={media} onSet={(t) => void changeTimer(t)} /> : null}
+              sungBy={singers.find((x) => x.id === items.find((i) => i.id === stageId)?.singer_id)?.name}
               status={sync.status}
               roles={sync.roles}
               highlightIds={highlight}
@@ -886,7 +1087,7 @@ export function SetlistPlayer({
   );
 }
 
-const CurrentSong = memo(function CurrentSong({ item }: { item: SetlistItem }) {
+const CurrentSong = memo(function CurrentSong({ item, hideChords }: { item: SetlistItem; hideChords: boolean }) {
   const { keyLabel } = deriveSong(item.song.original_key, item.settings);
   const sections = useSongSections(effectiveBody(item), item.song.original_key, item.settings);
   return (
@@ -895,7 +1096,7 @@ const CurrentSong = memo(function CurrentSong({ item }: { item: SetlistItem }) {
       info={{ title: item.song.title, key: keyLabel, tempo: item.song.tempo ? String(item.song.tempo) : "" }}
       sections={sections}
       size={item.settings.fontSize === FIT ? "fit" : item.settings.fontSize}
-      showChords={item.settings.showChords}
+      showChords={item.settings.showChords && !hideChords}
     />
   );
 });

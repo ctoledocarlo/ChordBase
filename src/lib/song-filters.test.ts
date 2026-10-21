@@ -64,4 +64,18 @@ describe("song filters in the URL", () => {
     expect(filterChips(parseSongFilters({ tempo_max: "70" }))[0].label).toBe("Up to 70 BPM");
     expect(filterChips(parseSongFilters({ q: "grace" }))).toEqual([]);
   });
+
+  it("filters by tags (collections), several at once, and shows each as a chip", () => {
+    const f = parseSongFilters({ tag: ["Easter", " communion ", "Easter", ""], key: "G" });
+    expect(f.tags).toEqual(["Easter", "communion"]);
+    expect(activeFilterCount(f)).toBe(2);
+    expect(filtersToParams(f).getAll("tag")).toEqual(["Easter", "communion"]);
+    const chips = filterChips(f);
+    expect(chips.map((c) => c.label)).toEqual(["Key G", "#Easter", "#communion"]);
+    expect(chips[1].without.tags).toEqual(["communion"]);
+    expect(chips[1].without.keys).toEqual(["G"]);
+    expect(parseSongFilters({}).tags).toEqual([]);
+    expect(parseSongFilters({ tag: "x".repeat(60) }).tags).toEqual([]);
+  });
 });
+

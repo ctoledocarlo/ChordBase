@@ -40,6 +40,8 @@ export function SetlistRail({
   keyControl,
   chat,
   reference,
+  clock,
+  sungBy,
 }: {
   role: ScreenRole;
   items: SetlistItem[];
@@ -73,6 +75,10 @@ export function SetlistRail({
   chat?: ReactNode;
   /** A quick reference shown between what is on stage and the list (the chords in the key). */
   reference?: ReactNode;
+  /** The service clock, shown at the top. */
+  clock?: ReactNode;
+  /** Who sings the song on stage. */
+  sungBy?: string;
 }) {
   const media = role === "media";
   // Stage screens choose what they are looking at themselves; Viewer screens only watch.
@@ -153,6 +159,7 @@ export function SetlistRail({
                 : "Connecting…"}
           </span>
         </p>
+        {clock && <div className="flex-none">{clock}</div>}
         {media && !live && (
           <button data-tour="setlist-golive" type="button" className="btn btn-primary flex-none px-2.5 py-0.5 text-[0.8125rem]" onClick={onGoLive} disabled={items.length === 0}>
             Go live
@@ -212,6 +219,12 @@ export function SetlistRail({
             <span className="text-muted">{items.length === 0 ? "Nothing in the setlist yet" : "Nothing chosen yet"}</span>
           )}
         </p>
+        {sungBy && (
+          <p className="flex items-baseline gap-2">
+            <span className="w-12 flex-none text-[0.625rem] font-medium uppercase tracking-wide text-muted">Sung by</span>
+            <span className="min-w-0 flex-1 truncate">{sungBy}</span>
+          </p>
+        )}
         <p className="flex items-baseline gap-2">
           <span className="w-12 flex-none text-[0.625rem] font-medium uppercase tracking-wide text-muted">Up next</span>
           {next ? (

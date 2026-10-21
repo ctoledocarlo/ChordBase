@@ -8,7 +8,11 @@ export type SongInfo = {
   timeSignature: string;
   capo: string;
   ccli: string;
+  /** Tags typed as "Easter, communion". */
   tags: string;
+  /** The melody's lowest and highest note in the usual key ("A3"), or empty. */
+  melodyLow: string;
+  melodyHigh: string;
 };
 
 export type EditorTab = "lyrics" | "chords" | "preview";

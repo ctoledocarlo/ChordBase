@@ -194,7 +194,7 @@ export function SetlistChordEditor({
       </SidebarPortal>
 
       <ChordsTab
-        info={{ title, artist: "", key: keyLabel, tempo: tempo ? String(tempo) : "", timeSignature: "", capo: "", ccli: "", tags: "" }}
+        info={{ title, artist: "", key: keyLabel, tempo: tempo ? String(tempo) : "", timeSignature: "", capo: "", ccli: "", tags: "", melodyLow: "", melodyHigh: "" }}
         sections={sections}
         editing={editing}
         size={item.settings.fontSize === FIT ? "fit" : item.settings.fontSize}

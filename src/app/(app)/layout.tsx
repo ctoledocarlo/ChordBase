@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { signOut } from "./actions";
 import { AppShell } from "@/components/app-shell";
+import { LogoutButton } from "@/components/logout-button";
 import { SongSkeleton } from "@/components/skeletons";
 import { getCurrentChurch } from "@/lib/church";
 
@@ -26,11 +27,7 @@ async function ChurchBar() {
   return (
     <div className="flex items-center gap-3 text-sm">
       {church && <span className="hidden font-medium text-muted sm:inline">{church.name}</span>}
-      <form action={signOut}>
-        <button type="submit" className="whitespace-nowrap text-sm underline">
-          Log out
-        </button>
-      </form>
+      <LogoutButton action={signOut} />
     </div>
   );
 }

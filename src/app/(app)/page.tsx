@@ -77,6 +77,14 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Songs</h1>
           <p className="mt-1 text-sm text-muted">{summary}</p>
+          <p data-tour="songs-tools" className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <Link href="/songs/history" className="text-muted underline hover:text-foreground">
+              Service history
+            </Link>
+            <Link href="/songs/cleanup" className="text-muted underline hover:text-foreground">
+              Tidy up the library
+            </Link>
+          </p>
         </div>
         <div data-tour="songs-buttons" className="flex flex-none gap-2">
           <Link href="/songs/import" className="btn">
@@ -174,6 +182,15 @@ async function Library({ searchParams }: { searchParams: PageProps<"/">["searchP
                     </span>
                   )}
                   {s.snippet && <span className="block truncate text-sm italic text-muted">“{s.snippet}”</span>}
+                  {s.tags && s.tags.length > 0 && (
+                    <span className="mt-0.5 flex flex-wrap gap-1">
+                      {s.tags.slice(0, 4).map((t) => (
+                        <span key={t} className="rounded-full bg-hover px-2 py-px text-[0.6875rem] text-muted">
+                          #{t}
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </span>
                 <span aria-hidden className="text-muted transition-transform group-hover:translate-x-0.5">
                   →
