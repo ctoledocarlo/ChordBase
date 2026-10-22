@@ -2,11 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { getRemoteState, joinRemote, leaveRemote, remoteGoTo, remoteSaveSettings, remoteSendMessage, remoteSetTaskDone, remoteSetTimer } from "@/app/r/actions";
+import { getRemoteState, joinRemote, leaveRemote, remoteGoTo, remoteSaveNote, remoteSaveSettings, remoteSendMessage, remoteSetTaskDone, remoteSetTimer } from "@/app/r/actions";
 import { cleanPin } from "@/lib/remote-token";
 import { deriveSong } from "@/lib/setlist-derive";
 import { mergeRemote } from "@/lib/setlist-sync";
-import { everyoneView, noteFor, notesToShow, taskProgress, tasksFor, type SetlistTask } from "@/lib/setlist-team";
+import { MAX_NOTE, everyoneView, noteFor, notesToShow, taskProgress, tasksFor, type SetlistTask } from "@/lib/setlist-team";
 import type { ChatMessage, SetlistItem } from "@/lib/setlists";
 import type { RemoteState } from "@/lib/remote-access";
 import { ServiceClock } from "./service-clock";
@@ -103,6 +103,12 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
   const [extras, setExtras] = useState(initial.extras);
   const [status, setStatus] = useState<"live" | "offline">("live");
   const [chatOpen, setChatOpen] = useState(false);
+  // A song waiting for "yes, put it on stage": changing the live song is never one accidental tap.
+  const [ask, setAsk] = useState<{ id: string; title: string } | null>(null);
+  // The song whose note for this phone's instrument is being written, and what has been typed.
+  const [editItemId, setEditItemId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   // Which instrument this phone is, for this setlist (remembered on the phone, and the same choice a Stage screen makes).
   const [chosen, setChosen] = useStoredText(`chordbase.stageView.${setlistId}`, "");
 
@@ -225,6 +231,34 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
     await run(remoteGoTo(setlistId, id, screenId, localDay()));
   }
 
+  /** Asks before putting a song on stage (the song already there needs nothing). */
+  function request(id: string) {
+    const item = items.find((i) => i.id === id);
+    if (item && id !== stageId) setAsk({ id, title: item.song.title });
+  }
+
+  function startNote() {
+    if (!onStage || !myViewId) return;
+    setDraft(noteFor(notes, onStage.id, myViewId)?.body ?? "");
+    setEditItemId(onStage.id);
+  }
+
+  async function saveNote() {
+    if (!editItemId || !myViewId) return;
+    setSavingNote(true);
+    epoch.current++;
+    const res = await remoteSaveNote(setlistId, editItemId, myViewId, draft);
+    epoch.current++;
+    setSavingNote(false);
+    if (refused(res)) return;
+    if ("error" in res) return toast(res.error, { tone: "error" });
+    const saved = res.note;
+    const item = editItemId;
+    const view = myViewId;
+    setExtras((e) => ({ ...e, notes: [...e.notes.filter((n) => !(n.item_id === item && n.view_id === view)), ...(saved ? [saved] : [])] }));
+    setEditItemId(null);
+  }
+
   // The key of the song on stage, saved a moment after the last tap.
   const keyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   function stepKey(delta: number) {
@@ -264,6 +298,8 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
   const instruments = views.filter((v) => v.kind === "instrument");
   const noteLabel = (view: { kind: string; name: string }) => (view.kind === "all" ? "Everyone" : view.name);
 
+  // Only an instrument's own note can be written from a phone (not the shared "Everyone" one).
+  const canWriteNote = myView?.kind === "instrument";
   const stageNotes = onStage ? notesToShow(notes, views, onStage.id, myViewId) : [];
   const nextNotes = next ? notesToShow(notes, views, next.id, myViewId) : [];
 
@@ -294,59 +330,81 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
         </label>
       )}
 
-      <section data-tour="remote-stage" aria-label="On stage" className="rounded-2xl border border-line p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted">On stage</p>
+      <section data-tour="remote-stage" aria-label="On stage" className="rounded-xl border border-line p-3">
         {onStage ? (
           <>
-            <p className="mt-1 text-2xl font-semibold leading-tight">{onStage.song.title}</p>
-            <p className="mt-1 font-mono text-sm text-muted">{keyName}</p>
-            {stageNotes.length > 0 && (
-              <div className="mt-3 space-y-2 border-t border-line pt-3" aria-label="Notes for this song">
+            <div className="flex items-baseline gap-2">
+              <span className="flex-none text-[0.6875rem] font-medium uppercase tracking-wide text-muted">On stage</span>
+              <p className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight">{onStage.song.title}</p>
+              <span className="flex-none font-mono text-sm text-muted">{keyName}</span>
+            </div>
+            {(stageNotes.length > 0 || canWriteNote) && (
+              <div className="mt-2 space-y-1.5 border-t border-line pt-2 text-sm" aria-label="Notes for this song">
                 {stageNotes.map(({ view, body }) => (
-                  <div key={view.id}>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted">Notes · {noteLabel(view)}</p>
-                    <p className="whitespace-pre-wrap text-base">{body}</p>
-                  </div>
+                  <p key={view.id} className="whitespace-pre-wrap leading-snug">
+                    <span className="mr-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted">{noteLabel(view)}</span>
+                    {body}
+                  </p>
                 ))}
+                {canWriteNote &&
+                  (editItemId === onStage.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        autoFocus
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        maxLength={MAX_NOTE}
+                        rows={3}
+                        className="field field-sm"
+                        aria-label={`Notes for ${myView?.name}`}
+                        placeholder={`Notes for ${myView?.name}…`}
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" className="btn btn-primary px-3 py-1 text-sm" onClick={() => void saveNote()} disabled={savingNote}>
+                          {savingNote ? "Saving…" : "Save note"}
+                        </button>
+                        <button type="button" className="btn px-3 py-1 text-sm" onClick={() => setEditItemId(null)} disabled={savingNote}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" className="text-xs text-muted underline" onClick={startNote}>
+                      {noteFor(notes, onStage.id, myViewId!)?.body.trim() ? `Edit ${myView?.name} note` : `Add a note for ${myView?.name}`}
+                    </button>
+                  ))}
               </div>
             )}
             {next && (
-              <div className="mt-3 border-t border-line pt-3 text-sm">
-                <p>
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted">Up next </span>
-                  {next.song.title}
-                </p>
-                {nextNotes.map(({ view, body }) => (
-                  <p key={view.id} className="mt-1 whitespace-pre-wrap text-muted">
-                    <span className="font-medium">{noteLabel(view)}:</span> {body}
-                  </p>
-                ))}
-              </div>
+              <p className="mt-2 truncate text-xs text-muted">
+                <span className="font-medium uppercase tracking-wide">Next </span>
+                {next.song.title}
+                {nextNotes.map(({ view, body }) => ` · ${noteLabel(view)}: ${body}`).join("")}
+              </p>
             )}
+            <div className="mt-2.5 grid grid-cols-2 gap-2">
+              <button type="button" className="btn min-h-11" disabled={stageIndex <= 0} onClick={() => request(items[stageIndex - 1].id)}>
+                ← Previous
+              </button>
+              <button type="button" className="btn btn-primary min-h-11" disabled={!next} onClick={() => next && request(next.id)}>
+                Next →
+              </button>
+            </div>
           </>
         ) : (
-          <p className="mt-1 text-muted">Nothing in the setlist yet.</p>
+          <p className="text-muted">Nothing in the setlist yet.</p>
         )}
       </section>
 
-      <div className="grid grid-cols-2 gap-3">
-        <button type="button" className="btn min-h-16 text-lg" disabled={stageIndex <= 0} onClick={() => void goTo(items[stageIndex - 1].id)}>
-          ← Previous
-        </button>
-        <button type="button" className="btn btn-primary min-h-16 text-lg" disabled={!next} onClick={() => next && void goTo(next.id)}>
-          Next →
-        </button>
-      </div>
-
       {onStage && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-1.5">
           <span className="text-sm text-muted">Key of the song on stage</span>
           <span className="flex items-center gap-2">
-            <button type="button" className="btn btn-icon h-10 w-10 text-lg" onClick={() => stepKey(-1)} aria-label="Down a half step">
+            <button type="button" className="btn btn-icon h-9 w-9 text-lg" onClick={() => stepKey(-1)} aria-label="Down a half step">
               −
             </button>
             <span className="w-12 text-center font-mono font-semibold">{deriveSong(onStage.song.original_key, onStage.settings).soundingKey || onStage.settings.semitones}</span>
-            <button type="button" className="btn btn-icon h-10 w-10 text-lg" onClick={() => stepKey(1)} aria-label="Up a half step">
+            <button type="button" className="btn btn-icon h-9 w-9 text-lg" onClick={() => stepKey(1)} aria-label="Up a half step">
               +
             </button>
           </span>
@@ -364,7 +422,7 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
               <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => void goTo(item.id)}
+                  onClick={() => request(item.id)}
                   aria-current={item.id === stageId ? "true" : undefined}
                   className={`flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left ${item.id === stageId ? "bg-hover font-medium" : "hover:bg-hover"}`}
                 >
@@ -427,6 +485,35 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
             }}
           />
         </div>
+      )}
+
+      {ask && (
+        <>
+          <div aria-hidden className="fixed inset-0 z-40 bg-black/40" onClick={() => setAsk(null)} />
+          <div role="alertdialog" aria-modal="true" aria-label="Change the song on stage" className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-background p-4 shadow-lg">
+            <div className="mx-auto max-w-md space-y-3">
+              <p>
+                Put <strong>{ask.title}</strong> on stage? Every screen will switch to it.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button type="button" className="btn min-h-12" onClick={() => setAsk(null)} autoFocus>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary min-h-12"
+                  onClick={() => {
+                    const id = ask.id;
+                    setAsk(null);
+                    void goTo(id);
+                  }}
+                >
+                  Yes, put it on stage
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       <button type="button" className="btn btn-quiet mt-auto self-center text-sm" onClick={() => void leave()}>

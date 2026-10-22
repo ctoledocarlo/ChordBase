@@ -243,7 +243,10 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     if (table === "rpc/song_facets") return send(200, facets);
     if (table === "chord_shortcuts") return send(200, [{ id: randomUUID(), chord: "G" }, { id: randomUUID(), chord: "D" }]);
     if (table === "setlist_messages") return send(200, messages);
-    if (table === "setlist_views") return send(200, views);
+    if (table === "setlist_views") {
+      const wanted = (url.searchParams.get("id") ?? "").replace("eq.", "");
+      return send(200, wanted ? views.filter((v) => v.id === wanted) : views);
+    }
     if (table === "setlist_notes") return send(200, notes);
     if (table === "setlist_tasks") return send(200, tasks.map((t) => (taskDone.has(t.id) ? { ...t, ...taskDone.get(t.id) } : t)));
     if (table === "song_versions") {

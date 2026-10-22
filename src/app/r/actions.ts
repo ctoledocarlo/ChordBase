@@ -8,6 +8,7 @@ import { recordPlayWith } from "@/lib/record-play";
 import { readRemoteState, remoteAccess, type Access, type RemoteState } from "@/lib/remote-access";
 import { REMOTE_TTL_SECONDS, cleanPin, isPin, isUuid, pinGuardKeys, pinsMatch, remoteCookie, signRemote } from "@/lib/remote-token";
 import { validSettings } from "@/lib/setlist-settings";
+import { MAX_NOTE, NOTE_COLUMNS, type SetlistNote } from "@/lib/setlist-team";
 import { MESSAGE_COLUMNS, type ChatMessage } from "@/lib/setlists";
 import type { PresetSettings } from "@/lib/songs";
 import { serviceClient, serviceKey } from "@/lib/supabase/service";
@@ -150,5 +151,29 @@ export async function remoteSendMessage(setlistId: string, body: string, clientI
       return failed("Couldn't send that. Please try again.");
     }
     return { message: data };
+  });
+}
+
+/** Saves the note for one song on one instrument's view (an empty note removes it). A phone can write for an instrument, never for "Everyone". */
+export async function remoteSaveNote(setlistId: string, itemId: string, viewId: string, body: string): Promise<{ note: SetlistNote | null } | { error: string } | Denied> {
+  if (!isUuid(itemId) || !isUuid(viewId)) return { error: "That song isn't in the setlist any more." };
+  if (typeof body !== "string" || body.length > MAX_NOTE) return { error: `Keep a note under ${MAX_NOTE} characters.` };
+  return withRemote(setlistId, async ({ db, setlist }) => {
+    const [{ data: view }, { data: item }] = await Promise.all([
+      db.from("setlist_views").select("id").eq("id", viewId).eq("setlist_id", setlist.id).eq("kind", "instrument").maybeSingle(),
+      db.from("setlist_items").select("id").eq("id", itemId).eq("setlist_id", setlist.id).maybeSingle(),
+    ]);
+    if (!view) return { error: "Phones can write notes for an instrument. Pick one first." };
+    if (!item) return { error: "That song isn't in the setlist any more." };
+    if (body.trim() === "") {
+      const { error } = await db.from("setlist_notes").delete().eq("item_id", itemId).eq("view_id", viewId).eq("setlist_id", setlist.id);
+      return error ? { error: "Couldn't clear that note." } : { note: null };
+    }
+    const { data, error } = await db
+      .from("setlist_notes")
+      .upsert({ church_id: setlist.church_id, setlist_id: setlist.id, item_id: itemId, view_id: viewId, body: body.replace(/\r\n?/g, "\n") }, { onConflict: "item_id,view_id" })
+      .select(NOTE_COLUMNS)
+      .single<SetlistNote>();
+    return error || !data ? { error: "Couldn't save that note." } : { note: data };
   });
 }

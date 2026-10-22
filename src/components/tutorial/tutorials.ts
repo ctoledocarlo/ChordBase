@@ -651,11 +651,11 @@ const FUNCTIONS: Tutorial[] = [
       },
       {
         title: "3. Pick the instrument",
-        body: "On the phone, “This phone is” chooses the instrument. The phone then shows the shared notes and that instrument's notes for the song on stage and the one after it, and that instrument's checklist.",
+        body: "On the phone, “This phone is” chooses the instrument. The phone then shows the shared notes and that instrument's notes for the song on stage and the one after it, and that instrument's checklist. A phone set to an instrument can also add or edit that instrument's note for the song on stage.",
       },
       {
         title: "4. Control the service",
-        body: "Previous and Next change the song on stage for every screen. Tapping a song sends it there, the key buttons change its key, and the time sets the countdown.",
+        body: "Previous, Next, or tapping a song asks “Put it on stage?” first, so a stray tap can't change what everyone sees. The key buttons change the key of the song on stage, and the time sets the countdown. On the Media screen, the play button beside a song has no confirmation and changes the song on stage immediately.",
       },
       {
         target: "setlist-remote-fold",

@@ -289,6 +289,11 @@ export function SetlistRail({
             </span>
           )}
         </p>
+        {media && (
+          <p className="mb-1.5 text-xs text-muted">
+            The play button beside a song puts it on stage <strong className="font-medium text-foreground">immediately</strong>, for every screen. There is no confirmation.
+          </p>
+        )}
         <ol onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setGap(null); }}>
           {items.map((item, i) => {
             const looking = item.id === currentId;
@@ -377,8 +382,8 @@ export function SetlistRail({
                     className="btn btn-icon"
                     disabled={stage}
                     onClick={() => onSendToStage(item.id)}
-                    aria-label={`Show ${item.song.title} on stage`}
-                    title="Show on stage"
+                    aria-label={`Put ${item.song.title} on stage right now`}
+                    title="Put on stage right now (no confirmation)"
                   >
                     <PlayIcon />
                   </button>
