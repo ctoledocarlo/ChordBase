@@ -13,6 +13,7 @@ import {
 import { deriveSong } from "@/lib/setlist-derive";
 import { FIT, defaultSettings } from "@/lib/setlist-settings";
 import type { PresetSettings } from "@/lib/songs";
+import { Fold } from "./fold";
 import { MinusIcon, PlusIcon } from "./icons";
 
 /** All 12 key names for the picker, with minor keys labelled when the song is minor. */
@@ -167,17 +168,32 @@ const same = (a: PresetSettings, b: PresetSettings) =>
   a.semitones === b.semitones && a.capo === b.capo && a.spelling === b.spelling &&
   a.showChords === b.showChords && a.fontSize === b.fontSize && (a.style ?? "original") === (b.style ?? "original");
 
-/** Key, capo, sharps and flats, and display options for one song. */
+/** A small heading over one control, inside a collapsible group. */
+function Field({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1 text-xs font-medium text-muted">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Key, capo, sharps and flats, and display options for one song. With `grouped` they sit in three collapsible
+ * groups (key and capo open, the rest closed) that say what they are set to, which keeps a sidebar short.
+ */
 export function SongSettingsPanel({
   originalKey,
   defaultCapo,
   settings,
   onChange,
+  grouped = false,
 }: {
   originalKey: string;
   defaultCapo: number;
   settings: PresetSettings;
   onChange: (settings: PresetSettings) => void;
+  grouped?: boolean;
 }) {
   const defaults = defaultSettings(defaultCapo);
   const set = (patch: Partial<PresetSettings>) => onChange({ ...settings, ...patch });
@@ -185,6 +201,72 @@ export function SongSettingsPanel({
   const { hasKey, soundingKey, shownShapeKey } = deriveSong(originalKey, settings);
 
   const stepSize = (delta: number) => set({ fontSize: steppedSize(settings, delta) });
+
+  if (grouped) {
+    const style = CHORD_STYLES.find((s) => s.value === (settings.style ?? "original"))?.label;
+    const spellingHint = spellingChoice === "auto" ? undefined : spellingChoice === "sharp" ? "sharps" : "flats";
+    return (
+      <>
+        <Fold title="Key and capo" defaultOpen hint={hasKey ? `${soundingKey}${capo > 0 ? ` · capo ${capo}` : ""}` : capo > 0 ? `capo ${capo}` : undefined}>
+          <Field title="Key">
+            <KeyPicker originalKey={originalKey} settings={settings} onChange={onChange} steppers compact />
+          </Field>
+          <Field title="Capo">
+            <select className="field field-sm" aria-label="Capo" value={capo} onChange={(e) => set({ capo: Number(e.target.value) })}>
+              <option value={0}>No capo</option>
+              {Array.from({ length: 12 }, (_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Fret {i + 1}
+                </option>
+              ))}
+            </select>
+            {capo > 0 && hasKey && (
+              <p className="mt-1 text-xs text-muted">
+                Play {shownShapeKey} shapes to sound in {soundingKey}.
+              </p>
+            )}
+          </Field>
+        </Fold>
+
+        <Fold title="Chord style" hint={[style && style !== "Original" ? style : null, spellingHint].filter(Boolean).join(" · ") || undefined}>
+          <Field title="Sharps and flats">
+            <select className="field field-sm" aria-label="Sharps and flats" value={spellingChoice} onChange={(e) => set({ spelling: e.target.value as PresetSettings["spelling"] })}>
+              <option value="auto">Automatic</option>
+              <option value="sharp">Sharps (#)</option>
+              <option value="flat">Flats (b)</option>
+            </select>
+          </Field>
+          <Field title="Style">
+            <ChordStylePicker settings={settings} onChange={onChange} compact />
+          </Field>
+        </Fold>
+
+        <Fold title="Text" hint={showChords ? (fontSize === FIT ? "fit to screen" : `${fontSize}px`) : "chords hidden"}>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={showChords} onChange={(e) => set({ showChords: e.target.checked })} />
+            Show chords
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" className="btn" onClick={() => stepSize(-2)} aria-label="Smaller text">
+              A−
+            </button>
+            <button type="button" className="btn" onClick={() => stepSize(2)} aria-label="Larger text">
+              A+
+            </button>
+            <button type="button" className={`btn ${fontSize === FIT ? "btn-primary" : ""}`} aria-pressed={fontSize === FIT} onClick={() => set({ fontSize: FIT })}>
+              Fit
+            </button>
+          </div>
+        </Fold>
+
+        {!same(settings, defaults) && (
+          <button className="text-sm text-muted underline hover:text-foreground" type="button" onClick={() => onChange(defaults)}>
+            Reset to original
+          </button>
+        )}
+      </>
+    );
+  }
 
   return (
     <>

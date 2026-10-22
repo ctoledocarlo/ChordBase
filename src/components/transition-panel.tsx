@@ -19,18 +19,21 @@ export function TransitionPanel({
   from,
   to,
   onChange,
+  bare = false,
 }: {
   from: SetlistItem;
   to: SetlistItem;
   onChange: (transition: Transition) => void;
+  /** Leave out the heading, for use inside a group that has its own. */
+  bare?: boolean;
 }) {
   const t = from.transition;
   // Reading both songs to suggest chords isn't free, so it's only redone when either song changes.
   const suggestion = useMemo(() => autoTransition(from, to), [from, to]);
   const keyed = from.song.original_key !== "" && to.song.original_key !== "";
 
-  return (
-    <Group title={`Transition to “${to.song.title}”`}>
+  const content = (
+    <>
       <div role="group" aria-label="Transition mode" className="grid grid-cols-3 gap-1.5">
         {MODES.map((m) => (
           <button
@@ -90,6 +93,7 @@ export function TransitionPanel({
       {t.mode === "none" && <p className="mt-2 text-sm text-muted">No bridge is shown between these two songs.</p>}
 
       <p className="mt-2 text-xs text-muted">Shown next to the setlist, from the end of this song into the start of the next.</p>
-    </Group>
+    </>
   );
+  return bare ? <div>{content}</div> : <Group title={`Transition to “${to.song.title}”`}>{content}</Group>;
 }

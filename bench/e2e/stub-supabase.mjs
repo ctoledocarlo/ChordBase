@@ -100,7 +100,7 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     { id: "00000000-0000-4000-8000-0000000000d2", name: "Tom", range_low: "C3", range_high: "A4" },
   ];
   // What the phone remote changes: kept so a later read shows it.
-  const setlistState = { remote_pin: null, active_item_id: null, timer_ends_at: null };
+  const setlistState = { remote_pin: null, remote_started_at: null, remote_expires_at: null, active_item_id: null, timer_ends_at: null };
   const taskDone = new Map();
   const failures = new Map();
   const bodyAt = (n) => fullSong.body.split("\n").slice(0, 8 + n).join("\n");

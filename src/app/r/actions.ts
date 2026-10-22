@@ -5,7 +5,8 @@ import { after } from "next/server";
 import { clientIp, waitMessage } from "@/lib/login-guard";
 import { gate, recordFailure, recordSuccess } from "@/lib/login-guard-store";
 import { recordPlayWith } from "@/lib/record-play";
-import { readRemoteState, remoteAccess, type Access, type RemoteState } from "@/lib/remote-access";
+import { readRemoteState, remoteAccess, switchOffRemote, type Access, type RemoteState } from "@/lib/remote-access";
+import { isOn } from "@/lib/remote-window";
 import { REMOTE_TTL_SECONDS, cleanPin, isPin, isUuid, pinGuardKeys, pinsMatch, remoteCookie, signRemote } from "@/lib/remote-token";
 import { validSettings } from "@/lib/setlist-settings";
 import { MAX_NOTE, NOTE_COLUMNS, type SetlistNote } from "@/lib/setlist-team";
@@ -46,9 +47,15 @@ export async function joinRemote(setlistId: string, typed: string): Promise<{ ok
   const guard = await gate(keys.all, keys.pair);
   if (guard.blockedFor > 0) return { error: waitMessage(guard.blockedFor) };
 
-  const { data } = await db.from("setlists").select("remote_pin, expires_at").eq("id", setlistId).maybeSingle<{ remote_pin: string | null; expires_at: string }>();
+  type Row = { remote_pin: string | null; expires_at: string; remote_started_at: string | null; remote_expires_at?: string | null };
+  const read = (columns: string) => db.from("setlists").select(columns).eq("id", setlistId).maybeSingle<Row>();
+  let { data } = await read("remote_pin, expires_at, remote_started_at, remote_expires_at");
+  // The end-time update may not have been run yet; an older remote ends four hours after it started.
+  if (!data) ({ data } = await read("remote_pin, expires_at, remote_started_at"));
   const actual = data?.remote_pin;
-  if (!actual || Date.parse(data.expires_at) <= Date.now() || !pinsMatch(pin, actual)) {
+  // A remote past its four hours is switched off here too, and looks the same as a wrong PIN.
+  if (actual && data && !isOn(data, Date.now())) await switchOffRemote(db, setlistId);
+  if (!actual || !data || Date.parse(data.expires_at) <= Date.now() || !isOn(data, Date.now()) || !pinsMatch(pin, actual)) {
     const lockedFor = await recordFailure(keys.all);
     return { error: lockedFor > 0 ? waitMessage(lockedFor) : "That PIN isn't right, or the remote has been switched off." };
   }

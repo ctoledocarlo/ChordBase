@@ -717,88 +717,68 @@ export function SetlistPlayer({
     <>
       {media && !(editChords && current && !live) && (
       <SidebarPortal>
-        <section data-tour="setlist-role">
-          <h2 className="mb-2 text-sm font-medium">This screen</h2>
-          <RoleSelect role={role} onChange={changeRole} />
-          <p className="mt-1.5 text-sm text-muted">
-            Media runs the setlist. Stage shows the song full screen for the band. Viewer only watches.
-          </p>
+        <div className="space-y-2.5">
+        <section data-tour="setlist-role" className="flex items-center gap-2" title="Media runs the setlist. Stage shows the song full screen for the band. Viewer only watches.">
+          <h2 className="flex-none text-sm font-medium">This screen</h2>
+          <RoleSelect role={role} onChange={changeRole} className="min-w-0 flex-1" />
         </section>
 
-        <section data-tour="setlist-info" className="border-t border-line pt-5">
-          <div className="mb-2 flex items-center justify-between gap-2">
+        <section data-tour="setlist-info" className="border-t border-line pt-3">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <h2 className="text-sm font-medium">Setlist</h2>
             <button
               type="button"
-              className="btn border-[#16a34a] bg-[#16a34a] font-medium text-white hover:!bg-[#15803d]"
+              className="btn border-[#16a34a] bg-[#16a34a] px-3 py-1 font-medium text-white hover:!bg-[#15803d]"
               onClick={() => void saveInfo()}
               disabled={!name.trim() || !dirty}
             >
               Save
             </button>
           </div>
-          <div className="grid gap-2">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={80}
-              aria-label="Setlist name"
-              className="field field-sm"
-            />
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              aria-label="Service date"
-              className="field field-sm"
-            />
-            <label className="block">
-              <span className="label">Expires {formatDay(expiresAt)}</span>
-              <select value={keep} onChange={(e) => setKeep(e.target.value)} className="field field-sm">
-                <option value="">Keep as it is</option>
-                {KEEP_OPTIONS.map((o) => (
-                  <option key={o.months} value={o.months}>
-                    Keep for {o.label} from today
-                  </option>
-                ))}
-              </select>
-            </label>
+          <div className="grid grid-cols-2 gap-1.5">
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} aria-label="Setlist name" className="field field-sm col-span-2" />
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} aria-label="Service date" className="field field-sm min-w-0" />
+            <select value={keep} onChange={(e) => setKeep(e.target.value)} aria-label="How long to keep this setlist" className="field field-sm min-w-0">
+              <option value="">Keep as it is</option>
+              {KEEP_OPTIONS.map((o) => (
+                <option key={o.months} value={o.months}>
+                  Keep for {o.label} from today
+                </option>
+              ))}
+            </select>
           </div>
-          {dirty ? (
-            <p className="mt-2 text-sm text-muted">You have unsaved changes.</p>
-          ) : (
-            infoNote && (
-              <p role="status" className="mt-2 text-sm text-muted">
-                {infoNote}
-              </p>
-            )
+          <p className="mt-1 text-xs text-muted">
+            Expires {formatDay(expiresAt)}
+            {dirty ? ". You have unsaved changes." : ""}
+          </p>
+          {!dirty && infoNote && (
+            <p role="status" className="text-xs text-muted">
+              {infoNote}
+            </p>
           )}
         </section>
 
         {current && (
           <>
-            <div className="space-y-2 border-t border-line pt-5">
+            <div className="space-y-1.5 border-t border-line pt-3">
               <p className="truncate text-sm font-medium">{current.song.title}</p>
-              <p className="text-sm text-muted">Change the chords for this setlist only:</p>
-              <button data-tour="setlist-edit-chords" type="button" className="btn btn-primary w-full" onClick={() => setEditChords(true)}>
-                Edit chords
-              </button>
-              {current.body_override !== null && (
-                <p className="text-sm text-muted">This setlist has its own chords for this song.</p>
-              )}
+              <div className="grid grid-cols-2 gap-2">
+                <button data-tour="setlist-edit-chords" type="button" className="btn btn-primary" onClick={() => setEditChords(true)} title="Change the chords for this setlist only">
+                  Edit chords
+                </button>
+                <Link href={`/songs/${current.song_id}/edit`} className="btn" title="Change the song itself, in every setlist">
+                  Edit song
+                </Link>
+              </div>
+              <p className="text-xs text-muted">
+                “Edit chords” changes this setlist only; “Edit song” changes every setlist. The settings below are saved for this setlist only.
+                {current.body_override !== null && " This setlist has its own chords for this song."}
+                {saveNote && <span role="status"> {saveNote}</span>}
+              </p>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted">Or change the song itself, in every setlist:</p>
-              <Link href={`/songs/${current.song_id}/edit`} className="btn w-full">
-                Edit the song itself
-              </Link>
-            </div>
-            <p className="text-sm text-muted">
-              The settings below are saved for this setlist only.
-              {saveNote && <span role="status"> {saveNote}</span>}
-            </p>
-            <div data-tour="setlist-settings" className="space-y-6">
+            <div data-tour="setlist-settings" className="space-y-2.5">
               <SongSettingsPanel
+                grouped
                 originalKey={current.song.original_key}
                 defaultCapo={current.song.default_capo}
                 settings={current.settings}
@@ -806,9 +786,9 @@ export function SetlistPlayer({
               />
             </div>
             {nextItem && (
-              <div data-tour="setlist-bridge">
-                <TransitionPanel from={current} to={nextItem} onChange={(t) => changeTransition(current.id, t)} />
-              </div>
+              <Fold title="Bridge to next song" tour="setlist-bridge" hint={current.transition.mode}>
+                <TransitionPanel bare from={current} to={nextItem} onChange={(t) => changeTransition(current.id, t)} />
+              </Fold>
             )}
             <Fold title="Who sings it" tour="setlist-singer" hint={singers.find((x) => x.id === current.singer_id)?.name}>
               <KeyForSinger
@@ -880,13 +860,14 @@ export function SetlistPlayer({
           <p className="text-xs text-muted">Songs are added to the history on their own when you put them on stage.</p>
         </Fold>
 
-        <div className="border-t border-line pt-5">
+        <div className="border-t border-line pt-3">
           <DeleteButton
             action={deleteSetlist}
             id={setlist.id}
             title="Delete this setlist?"
             message={`“${setlist.name}” will be deleted. The songs in it stay in your library.`}
           />
+        </div>
         </div>
       </SidebarPortal>
       )}

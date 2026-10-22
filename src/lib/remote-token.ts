@@ -8,7 +8,7 @@ import type { GuardKey } from "./login-guard";
  */
 
 export const PIN_LENGTH = 6;
-/** How long a joined phone stays joined. A service day, with time to spare. */
+/** The longest a joined phone's ticket can last. The remote itself switches off sooner (see remote-window.ts), which ends it for every phone. */
 export const REMOTE_TTL_SECONDS = 12 * 60 * 60;
 
 export const isPin = (value: unknown): value is string => typeof value === "string" && /^\d{6}$/.test(value);

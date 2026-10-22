@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { getRemoteState, joinRemote, leaveRemote, remoteGoTo, remoteSaveNote, remoteSaveSettings, remoteSendMessage, remoteSetTaskDone, remoteSetTimer } from "@/app/r/actions";
 import { cleanPin } from "@/lib/remote-token";
+import { canExtend, leftMs, leftWords } from "@/lib/remote-window";
 import { deriveSong } from "@/lib/setlist-derive";
 import { mergeRemote } from "@/lib/setlist-sync";
 import { MAX_NOTE, everyoneView, noteFor, notesToShow, taskProgress, tasksFor, type SetlistTask } from "@/lib/setlist-team";
 import type { ChatMessage, SetlistItem } from "@/lib/setlists";
 import type { RemoteState } from "@/lib/remote-access";
-import { ServiceClock } from "./service-clock";
+import { ServiceClock, useNow } from "./service-clock";
 import { SetlistChat } from "./setlist-chat";
 import { useToast } from "./toast";
 import { newScreenId } from "./use-setlist-sync";
@@ -100,6 +101,9 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
   const [activeId, setActiveId] = useState(initial.setlist.active_item_id);
   const [messages, setMessages] = useState<ChatMessage[]>(initial.messages);
   const [timerEndsAt, setTimerEndsAt] = useState(initial.setlist.timer_ends_at);
+  // When the remote switches itself off (Media can add an hour).
+  const [remoteEndsAt, setRemoteEndsAt] = useState(initial.remoteEndsAt);
+  const now = useNow();
   const [extras, setExtras] = useState(initial.extras);
   const [status, setStatus] = useState<"live" | "offline">("live");
   const [chatOpen, setChatOpen] = useState(false);
@@ -167,6 +171,7 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
             tasks: state.extras.tasks.map((t) => (pendingIds.current.has(t.id) ? (now.tasks.find((x) => x.id === t.id) ?? t) : t)),
           }));
           setTimerEndsAt(state.setlist.timer_ends_at);
+          setRemoteEndsAt(state.remoteEndsAt);
           setActiveId(state.setlist.active_item_id);
           setItems((local) => mergeRemote(local, state.items, { pendingIds: pendingIds.current, editingId: null }).items);
         }
@@ -292,6 +297,7 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
     router.refresh();
   }
 
+  const remoteLeft = remoteEndsAt && now !== 0 ? leftMs(remoteEndsAt, now) : 0;
   const myTasks = tasksFor(tasks, views, myViewId);
   const progress = taskProgress(myTasks);
   const keyName = onStage ? deriveSong(onStage.song.original_key, onStage.settings).keyLabel : "";
@@ -315,6 +321,12 @@ export function Remote({ setlistId, initial }: { setlistId: string; initial: Rem
         </div>
         <ServiceClock endsAt={timerEndsAt} canSet onSet={(t) => void changeTimer(t)} large />
       </header>
+
+      {remoteLeft > 0 && canExtend(remoteLeft) && (
+        <p role="status" className="rounded-xl border border-[#d97706] px-3 py-2 text-sm text-[#b45309] dark:text-[#fbbf24]">
+          This remote switches off in {leftWords(remoteLeft)}. Ask whoever runs Media to add an hour.
+        </p>
+      )}
 
       {instruments.length > 0 && (
         <label className="flex items-center gap-3 rounded-xl border border-line px-3 py-2">

@@ -643,7 +643,7 @@ const FUNCTIONS: Tutorial[] = [
         target: "setlist-remote-fold",
         sidebar: true,
         title: "1. Start it",
-        body: "Open “Phone remote” in the sidebar and press Start. You get a six-digit PIN and a QR code. Nothing can be joined until you start it.",
+        body: "Open “Phone remote” in the sidebar and press Start. You get a six-digit PIN and a QR code. Nothing can be joined until you start it, and it switches itself off after four hours.",
       },
       {
         title: "2. The band joins",
@@ -661,7 +661,7 @@ const FUNCTIONS: Tutorial[] = [
         target: "setlist-remote-fold",
         sidebar: true,
         title: "5. New PIN or switch it off",
-        body: "“New PIN” sends everyone back to the PIN screen, for when the PIN got shared too widely. “Switch the remote off” does the same and stops anyone joining until you start it again.",
+        body: "With half an hour or less left, “Add 1 more hour” appears. “New PIN” sends everyone back to the PIN screen, for when the PIN got shared too widely (it doesn't restart the four hours). “Switch the remote off” does the same and stops anyone joining until you start it again.",
         optional: true,
       },
     ],

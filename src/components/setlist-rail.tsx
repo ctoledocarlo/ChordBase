@@ -291,7 +291,7 @@ export function SetlistRail({
         </p>
         {media && (
           <p className="mb-1.5 text-xs text-muted">
-            The play button beside a song puts it on stage <strong className="font-medium text-foreground">immediately</strong>, for every screen. There is no confirmation.
+            ▶ puts a song on stage <strong className="font-medium text-foreground">immediately</strong>, for every screen.
           </p>
         )}
         <ol onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setGap(null); }}>
