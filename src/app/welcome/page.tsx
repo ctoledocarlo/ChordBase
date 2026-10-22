@@ -85,10 +85,16 @@ export default function WelcomePage() {
             </p>
             <div className="anim-rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "180ms" }}>
               <Link
-                href="/login"
+                href="/login?as=church&mode=signup"
                 className="rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200"
               >
-                Log in to your church
+                Register your church
+              </Link>
+              <Link
+                href="/login?mode=signup"
+                className="rounded-md border border-white/20 px-5 py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
+              >
+                Join as a team member
               </Link>
               <a href="#features" className="rounded-md px-4 py-2.5 text-sm font-medium text-zinc-300 hover:text-white">
                 See what&apos;s inside ↓
@@ -297,13 +303,23 @@ export default function WelcomePage() {
         <section className="reveal mx-auto w-full max-w-6xl px-6 pb-20">
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-blue-500/15 via-white/[0.03] to-transparent px-8 py-14 text-center">
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">Ready for Sunday?</h2>
-            <p className="mx-auto mt-3 max-w-md text-zinc-400">Log in with your church&apos;s shared login to open your songs and setlists.</p>
-            <Link
-              href="/login"
-              className="mt-7 inline-flex rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200"
-            >
-              Log in
-            </Link>
+            <p className="mx-auto mt-3 max-w-md text-zinc-400">
+              A church registers once. Band and media team members make their own account and apply to join it.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/login?as=church&mode=signup"
+                className="inline-flex rounded-md bg-white px-6 py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200"
+              >
+                Register your church
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex rounded-md border border-white/20 px-6 py-2.5 text-sm font-semibold transition-colors hover:bg-white/10"
+              >
+                Log in
+              </Link>
+            </div>
           </div>
         </section>
       </main>

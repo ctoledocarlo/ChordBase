@@ -8,7 +8,10 @@ export type Role = "church" | "admin" | "member";
 
 export const ROLES: Role[] = ["church", "admin", "member"];
 
-export const ROLE_LABELS: Record<Role, string> = { church: "Church", admin: "Admin", member: "Individual account" };
+/** A church normally has up to this many main accounts. */
+export const MAX_MAIN_ACCOUNTS = 2;
+
+export const ROLE_LABELS: Record<Role, string> = { church: "Church (main)", admin: "Admin", member: "Individual account" };
 
 export const isRole = (value: unknown): value is Role => typeof value === "string" && (ROLES as string[]).includes(value);
 
@@ -29,10 +32,14 @@ export function can(role: Role | null | undefined, action: Action): boolean {
   }
 }
 
-/** The roles the church account can give someone: never "church", and never to the church account itself. */
-export function rolesYouCanGive(actor: Role | null, target: Role): Role[] {
+/**
+ * The roles a main account can give someone: admin or individual account, and main account while the church has fewer
+ * than two. Never to a main account (its role is fixed here), and never as a way around the limit.
+ */
+export function rolesYouCanGive(actor: Role | null, target: Role, mainAccounts: number = MAX_MAIN_ACCOUNTS): Role[] {
   if (!can(actor, "manage-members") || target === "church") return [];
-  return (["admin", "member"] as Role[]).filter((r) => r !== target);
+  const options: Role[] = mainAccounts < MAX_MAIN_ACCOUNTS ? ["church", "admin", "member"] : ["admin", "member"];
+  return options.filter((r) => r !== target);
 }
 
 /** Whether the church account may remove this person. */

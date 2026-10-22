@@ -5,7 +5,7 @@ import { useState } from "react";
 import { decideApplication, removeMember, setMemberRole } from "@/app/(app)/members/actions";
 import { describeMinistries, fullName } from "@/lib/ministries";
 import type { Member, Request } from "@/lib/members";
-import { ROLE_LABELS, canRemove, rolesYouCanGive, type Role } from "@/lib/roles";
+import { MAX_MAIN_ACCOUNTS, ROLE_LABELS, canRemove, rolesYouCanGive, type Role } from "@/lib/roles";
 import { EmptyState } from "./empty-state";
 import { useToast } from "./toast";
 
@@ -37,17 +37,21 @@ export function MembersView({ members, requests, actor }: { members: Member[]; r
     router.refresh();
   }
 
+  const mains = members.filter((m) => m.role === "church").length;
+  const giveLabel: Record<Role, string> = { church: "Make main account", admin: "Make admin", member: "Make individual account" };
+  const givenLabel: Record<Role, string> = { church: "Now a main account.", admin: "Now an admin.", member: "Now an individual account." };
+
   const groups: { role: Role; title: string }[] = [
-    { role: "church", title: "Church" },
-    { role: "admin", title: "Admins" },
-    { role: "member", title: "Individual accounts" },
+    { role: "church", title: `Church (main) · ${mains} of ${MAX_MAIN_ACCOUNTS}` },
+    { role: "admin", title: `Admins · ${members.filter((m) => m.role === "admin").length}` },
+    { role: "member", title: `Individual accounts · ${members.filter((m) => m.role === "member").length}` },
   ];
 
   return (
     <div className="mx-auto w-full max-w-3xl">
       <h1 className="text-2xl font-semibold tracking-tight">Team</h1>
       <p className="mt-1 text-sm text-muted">
-        Church (this account), then admins, then individual accounts. What each can do will grow over time; for now only the church account approves requests and manages people.
+        Church (main), then admins, then individual accounts. A church has up to 2 main accounts. What each role can do will grow over time; for now only main accounts approve requests and manage people.
       </p>
 
       <section className="mt-6" aria-labelledby="requests-title">
@@ -92,12 +96,12 @@ export function MembersView({ members, requests, actor }: { members: Member[]; r
           return (
             <div key={role}>
               <h2 className="mb-2 text-sm font-medium">
-                {title} <span className="font-normal text-muted">{list.length}</span>
+                {title}
               </h2>
               <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
                 {list.map((m) => {
                   const name = fullName(m.first_name, m.last_name);
-                  const give = rolesYouCanGive(actor, m.role);
+                  const give = rolesYouCanGive(actor, m.role, mains);
                   return (
                     <li key={m.user_id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
                       <div className="min-w-0 flex-1">
@@ -127,9 +131,9 @@ export function MembersView({ members, requests, actor }: { members: Member[]; r
                                 type="button"
                                 className="btn"
                                 disabled={busy !== null}
-                                onClick={() => void run(m.user_id, setMemberRole(m.user_id, r), r === "admin" ? "Now an admin." : "Now an individual account.")}
+                                onClick={() => void run(m.user_id, setMemberRole(m.user_id, r), givenLabel[r])}
                               >
-                                {r === "admin" ? "Make admin" : "Make individual account"}
+                                {giveLabel[r]}
                               </button>
                             ))}
                             {canRemove(actor, m.role) && (

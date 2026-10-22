@@ -108,7 +108,7 @@ check("a member can't make themselves an admin", (await call(ids.applicant, `pub
 check("a member can't remove anyone", (await call(ids.applicant, `public.remove_member('${ids.church}')`)).error !== undefined);
 check("a member can't list the members", (await as(ids.applicant, "select * from public.church_members()")).length === 0);
 check("a member can't write the tables directly", (await denied(ids.applicant, `update public.church_accounts set role = 'church' where user_id = '${ids.applicant}'`)) && (await denied(ids.applicant, `insert into public.church_applications (user_id, church_id, first_name, last_name, ministries) values ('${ids.applicant}', '${CHURCH}', 'a', 'b', array['media'])`)));
-check("the role can't be set to anything else", (await call(ids.church, `public.set_member_role('${ids.applicant}', 'church')`)).error !== undefined);
+check("a made-up role is refused", (await call(ids.church, `public.set_member_role('${ids.applicant}', 'owner')`)).error !== undefined);
 
 // ---- a member's own details ----------------------------------------------------------------------------------------
 check("a member can change their ministries", (await call(ids.applicant, "public.update_my_profile('Maria', 'Reyes', array['media','stage:drums'])")).ok === true);
@@ -132,6 +132,41 @@ check("a made-up person is refused", (await call(ids.church, "public.remove_memb
 check("remove a member", (await call(ids.church, `public.remove_member('${ids.applicant}')`)).ok === true);
 check("a removed member loses access at once", (await as(ids.applicant, "select count(*) n from public.songs"))[0].n === 0);
 check("and can apply again", (await apply(ids.applicant, CHURCH, "Maria", "Reyes", "array['media']")).ok === true);
+
+// ---- registering a church, and two main accounts at most -------------------------------------------------------------
+const founder = "00000000-0000-4000-8000-0000000000c1";
+const founder2 = "00000000-0000-4000-8000-0000000000c2";
+const third = "00000000-0000-4000-8000-0000000000c3";
+await db.exec(`insert into auth.users (id, email) values ('${founder}', 'pastor@example.com'), ('${founder2}', 'deacon@example.com'), ('${third}', 'elder@example.com');`);
+const register = (user, name) => call(user, `public.register_church(${lit(name)})`);
+check("a church needs a name", (await register(founder, " ")).error?.includes("name"));
+check("a member can't register another church", (await register(ids.church, "Another Church")).error?.includes("already belongs"));
+check("anonymous visitors can't register a church", await denied(null, "select public.register_church('Nope Church')"));
+check("a church can't take the name of one that exists", (await register(founder, "  bench   CHURCH ")).error?.includes("already on ChordBase"));
+await apply(founder, CHURCH, "Pat", "Pastor", "array['media']");
+check("registering a church works", (await register(founder, "Grace Chapel")).ok === true);
+const grace = (await db.query("select id, slug from public.churches where name = 'Grace Chapel'")).rows[0];
+check("the new church has a slug", grace?.slug === "grace-chapel");
+check("registering withdrew the waiting application elsewhere", (await db.query(`select count(*)::int n from public.church_applications where user_id = '${founder}' and status = 'pending'`)).rows[0].n === 0);
+check("the founder is the church's first main account", (await db.query(`select role from public.church_accounts where user_id = '${founder}'`)).rows[0].role === "church");
+check("a second registration with the same name is refused, whatever the case", (await register(founder2, "GRACE CHAPEL")).error?.includes("already on ChordBase"));
+check("a similar name gets its own slug", (await register(founder2, "Grace-Chapel!")).ok === true && (await db.query("select slug from public.churches where name = 'Grace-Chapel!'")).rows[0].slug === "grace-chapel-2");
+check("the founder can't be registered twice", (await register(founder, "Grace Chapel Two")).error?.includes("already belongs"));
+check("the founder sees only their own church's people", (await as(founder, "select * from public.church_members()")).length === 1);
+check("people can apply to the new church", (await apply(third, grace.id, "Eli", "Elder", "array['stage:bass']")).ok === true);
+const graceReq = (await as(founder, "select * from public.church_requests()"))[0];
+check("only its own main account sees that request", graceReq?.email === "elder@example.com" && (await as(ids.church, "select * from public.church_requests()")).every((r) => r.email !== "elder@example.com"));
+await call(founder, `public.decide_application('${graceReq.id}', true)`);
+check("a main account can make a member a main account (the second of two)", (await call(founder, `public.set_member_role('${third}', 'church')`)).ok === true && (await db.query(`select role from public.church_accounts where user_id = '${third}'`)).rows[0].role === "church");
+const fourth = "00000000-0000-4000-8000-0000000000c4";
+await db.exec(`insert into auth.users (id, email) values ('${fourth}', 'fourth@example.com');`);
+await apply(fourth, grace.id, "Dee", "Fourth", "array['media']");
+const fourthReq = (await as(founder, "select * from public.church_requests()"))[0];
+await call(founder, `public.decide_application('${fourthReq.id}', true)`);
+check("a third main account is refused", (await call(founder, `public.set_member_role('${fourth}', 'church')`)).error?.includes("up to 2"));
+check("the second main account can manage people too", (await call(third, `public.set_member_role('${fourth}', 'admin')`)).ok === true);
+check("a main account's role can't be changed or removed", (await call(third, `public.set_member_role('${founder}', 'member')`)).error !== undefined && (await call(third, `public.remove_member('${founder}')`)).error !== undefined);
+check("the church still has exactly two main accounts", (await db.query(`select count(*)::int n from public.church_accounts where church_id = '${grace.id}' and role = 'church'`)).rows[0].n === 2);
 
 console.log(failures === 0 ? "\nAll checks passed." : `\n${failures} check(s) failed.`);
 process.exit(failures === 0 ? 0 : 1);

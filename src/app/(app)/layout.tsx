@@ -6,9 +6,11 @@ import { LogoutButton } from "@/components/logout-button";
 import { SongSkeleton } from "@/components/skeletons";
 import { AccountMenu } from "@/components/account-menu";
 import { JoinChurch } from "@/components/join-church";
+import { isAccountType } from "@/lib/account-type";
 import { getMembership } from "@/lib/church";
 import { countRequests, getMyApplication } from "@/lib/members";
 import { ROLE_LABELS, can } from "@/lib/roles";
+import { createClient } from "@/lib/supabase/server";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
@@ -81,6 +83,16 @@ async function ChurchNotice() {
     );
   }
   // Signed out visitors never get here (the proxy sends them to log in), but a stale session shouldn't show a join screen.
-  const application = await getMyApplication();
-  return <JoinChurch application={application} signOut={<LogoutButton action={signOut} />} />;
+  const supabase = await createClient();
+  const [application, { data }] = await Promise.all([getMyApplication(), supabase.auth.getUser()]);
+  // The door this account came in by: a church registering, or an individual joining.
+  const meta = data.user?.user_metadata ?? {};
+  return (
+    <JoinChurch
+      application={application}
+      signOut={<LogoutButton action={signOut} />}
+      accountType={isAccountType(meta.account_type) ? meta.account_type : "individual"}
+      churchName={typeof meta.church_name === "string" ? meta.church_name : ""}
+    />
+  );
 }

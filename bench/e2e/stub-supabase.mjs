@@ -102,6 +102,7 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
   // Joining a church: whether the signed-in login is in one, its application, and who is waiting.
   const join = {
     linked: true,
+    type: "individual",
     application: null,
     requests: [{ id: "00000000-0000-4000-8000-0000000000f1", user_id: "00000000-0000-4000-8000-0000000000f2", email: "maria@example.com", first_name: "Maria", last_name: "Reyes", ministries: ["stage:keys", "stage:vocals"], created_at: new Date().toISOString() }],
     members: [
@@ -166,8 +167,14 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     // For trying the join screen: /__linked?on=0 makes the signed-in login belong to no church.
     if (url.pathname === "/__linked") {
       join.linked = url.searchParams.get("on") !== "0";
+      join.type = url.searchParams.get("type") === "church" ? "church" : "individual";
       res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
       return res.end(JSON.stringify({ linked: join.linked }));
+    }
+
+    // The signed-in person, as the app asks for it when they belong to no church yet.
+    if (url.pathname === "/auth/v1/user") {
+      return send(200, { id: IDS.user, aud: "authenticated", role: "authenticated", email: "bench@example.com", app_metadata: {}, user_metadata: { account_type: join.type, church_name: join.type === "church" ? "Grace Chapel" : undefined }, created_at: new Date().toISOString() });
     }
 
     if (url.pathname === "/auth/v1/.well-known/jwks.json") {
@@ -227,6 +234,10 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
       if (table === "rpc/cancel_application") {
         join.application = null;
         return send(204);
+      }
+      if (table === "rpc/register_church") {
+        join.linked = true;
+        return send(200, { ok: true, church_id: IDS.church, name: parsed.p_name });
       }
       if (table === "rpc/church_requests") return send(200, join.requests);
       if (table === "rpc/church_members") return send(200, join.members);

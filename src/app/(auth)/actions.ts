@@ -47,16 +47,7 @@ export async function signIn(
   // A good login wipes this email's failures from this address (only if there were any to wipe).
   if (guard.hadFailures) await recordSuccess(keys.pair);
 
-  // A valid login that isn't linked to a church can't use the app.
-  const { data: link } = await supabase
-    .from("church_accounts")
-    .select("church_id")
-    .maybeSingle();
-  if (!link) {
-    await supabase.auth.signOut();
-    return { error: "This login isn't linked to a church yet.", email };
-  }
-
+  // Someone who isn't in a church yet still gets in: the first screen lets them join one or register their own.
   redirect("/");
 }
 

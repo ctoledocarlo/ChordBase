@@ -2,19 +2,35 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { applyToChurch, cancelApplication, searchChurches } from "@/app/(app)/members/actions";
+import { applyToChurch, cancelApplication, registerChurch, searchChurches } from "@/app/(app)/members/actions";
+import { MAX_CHURCH_NAME, churchNameProblem, type AccountType } from "@/lib/account-type";
 import { MAX_NAME, describeMinistries } from "@/lib/ministries";
 import type { Application } from "@/lib/members";
 import { Logo } from "./logo";
 import { MinistryPicker } from "./ministry-picker";
 
 /**
- * What someone sees when they have signed in but belong to no church yet: find a church, say who they are and what
- * they serve in, and apply. The church's own account answers. It covers the whole screen, so nothing of any church is
- * shown behind it (and the database wouldn't give them anything anyway).
+ * What someone sees when they have signed in but belong to no church yet. An individual finds their church, says who
+ * they are and what they serve in, and applies; the church's main account answers. A church registers itself and
+ * becomes its first main account. It covers the whole screen, so nothing of any church is shown behind it (and the
+ * database wouldn't give them anything anyway).
  */
-export function JoinChurch({ application, signOut }: { application: Application | null; signOut: ReactNode }) {
+export function JoinChurch({
+  application,
+  signOut,
+  accountType = "individual",
+  churchName = "",
+}: {
+  application: Application | null;
+  signOut: ReactNode;
+  /** Which door this account came in by; it decides which of the two screens is shown first. */
+  accountType?: AccountType;
+  /** The church name given when signing up, to start the registration with. */
+  churchName?: string;
+}) {
   const router = useRouter();
+  const [view, setView] = useState<"join" | "register">(accountType === "church" ? "register" : "join");
+  const [newChurch, setNewChurch] = useState(churchName);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<{ id: string; name: string }[] | null>(null);
   const [church, setChurch] = useState<{ id: string; name: string } | null>(null);
@@ -46,6 +62,17 @@ export function JoinChurch({ application, signOut }: { application: Application 
     setBusy(true);
     setError(null);
     const res = await applyToChurch(church.id, first, last, ministries);
+    setBusy(false);
+    if ("error" in res) return setError(res.error);
+    router.refresh();
+  }
+
+  async function register() {
+    const problem = churchNameProblem(newChurch);
+    if (problem) return setError(problem);
+    setBusy(true);
+    setError(null);
+    const res = await registerChurch(newChurch);
     setBusy(false);
     if ("error" in res) return setError(res.error);
     router.refresh();
@@ -91,6 +118,36 @@ export function JoinChurch({ application, signOut }: { application: Application 
             <button type="button" className="btn" onClick={() => void cancel()} disabled={busy}>
               {busy ? "Cancelling…" : "Cancel and apply somewhere else"}
             </button>
+          </section>
+        ) : view === "register" ? (
+          <section className="space-y-5">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Register your church</h1>
+              <p className="mt-2 text-muted">
+                You will be the church&apos;s first main account: you decide who joins and what each person is. A church has up to 2 main accounts.
+              </p>
+            </div>
+            <form
+              className="space-y-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void register();
+              }}
+            >
+              <label className="block">
+                <span className="label">Church name</span>
+                <input value={newChurch} onChange={(e) => setNewChurch(e.target.value)} className="field" maxLength={MAX_CHURCH_NAME} autoComplete="organization" autoFocus required />
+              </label>
+              <button type="submit" className="btn btn-primary min-h-11 w-full" disabled={busy || churchNameProblem(newChurch) !== null}>
+                {busy ? "Registering…" : "Register church"}
+              </button>
+            </form>
+            <p className="text-sm text-muted">
+              Is your church already on ChordBase?{" "}
+              <button type="button" className="font-medium text-foreground underline" onClick={() => { setError(null); setView("join"); }}>
+                Apply to join it
+              </button>
+            </p>
           </section>
         ) : (
           <section className="space-y-5">
@@ -177,6 +234,13 @@ export function JoinChurch({ application, signOut }: { application: Application 
                 </button>
               </form>
             )}
+
+            <p className="text-sm text-muted">
+              Do you run a church that isn&apos;t on ChordBase yet?{" "}
+              <button type="button" className="font-medium text-foreground underline" onClick={() => { setError(null); setView("register"); }}>
+                Register it
+              </button>
+            </p>
           </section>
         )}
 

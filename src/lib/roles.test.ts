@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ROLE_LABELS, can, canRemove, isRole, outranks, rolesYouCanGive } from "./roles";
+import { MAX_MAIN_ACCOUNTS, ROLE_LABELS, can, canRemove, isRole, outranks, rolesYouCanGive } from "./roles";
 
 describe("roles", () => {
   it("run Church, then Admins, then Individual accounts", () => {
@@ -8,6 +8,7 @@ describe("roles", () => {
     expect(outranks("member", "admin")).toBe(false);
     expect(outranks("admin", "admin")).toBe(false);
     expect(ROLE_LABELS.member).toBe("Individual account");
+    expect(ROLE_LABELS.church).toBe("Church (main)");
   });
 
   it("recognises only real roles", () => {
@@ -25,9 +26,14 @@ describe("roles", () => {
   });
 
   it("offers the roles the church account can give", () => {
-    expect(rolesYouCanGive("church", "member")).toEqual(["admin"]);
-    expect(rolesYouCanGive("church", "admin")).toEqual(["member"]);
-    expect(rolesYouCanGive("church", "church")).toEqual([]);
+    // With two main accounts already, only admin and individual account can be given.
+    expect(rolesYouCanGive("church", "member", 2)).toEqual(["admin"]);
+    expect(rolesYouCanGive("church", "admin", 2)).toEqual(["member"]);
+    expect(rolesYouCanGive("church", "church", 1)).toEqual([]);
+    // With room, a main account can be made too.
+    expect(rolesYouCanGive("church", "member", 1)).toEqual(["church", "admin"]);
+    expect(rolesYouCanGive("church", "admin", 1)).toEqual(["church", "member"]);
+    expect(MAX_MAIN_ACCOUNTS).toBe(2);
     expect(rolesYouCanGive("admin", "member")).toEqual([]);
     expect(rolesYouCanGive(null, "member")).toEqual([]);
   });

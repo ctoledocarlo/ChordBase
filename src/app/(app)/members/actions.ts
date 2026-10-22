@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isSignedIn } from "@/lib/church";
+import { churchNameProblem, tidyChurchName } from "@/lib/account-type";
 import { MAX_NAME, cleanMinistries } from "@/lib/ministries";
 import { isRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
@@ -12,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
  */
 
 const NOT_SIGNED_IN = "Sign in first.";
-const NEEDS_UPDATE = "Joining a church needs the latest database update (run migration 20261101000000_memberships.sql).";
+const NEEDS_UPDATE = "Joining or registering a church needs the latest database update (run migrations 20261101000000 and 20261102000000).";
 
 type Result = { ok: true } | { error: string };
 
@@ -77,7 +78,7 @@ export async function decideApplication(id: string, approve: boolean): Promise<R
 /** The church account makes someone an admin, or an individual account again. */
 export async function setMemberRole(userId: string, role: string): Promise<Result> {
   if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
-  if (!isRole(role) || role === "church") return { error: "Choose admin or individual account." };
+  if (!isRole(role)) return { error: "Choose main account, admin or individual account." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("set_member_role", { p_user: userId, p_role: role });
   const res = answer(data, error);
@@ -105,6 +106,18 @@ export async function updateMyProfile(first: string, last: string, ministries: s
   if (chosen.length === 0) return { error: "Choose at least one ministry." };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("update_my_profile", { p_first: f, p_last: l, p_ministries: chosen });
+  const res = answer(data, error);
+  if ("ok" in res) revalidatePath("/", "layout");
+  return res;
+}
+
+/** Registers a church. The person who does it becomes its first main account. */
+export async function registerChurch(churchName: string): Promise<Result> {
+  if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
+  const problem = churchNameProblem(typeof churchName === "string" ? churchName : "");
+  if (problem) return { error: problem };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("register_church", { p_name: tidyChurchName(churchName) });
   const res = answer(data, error);
   if ("ok" in res) revalidatePath("/", "layout");
   return res;

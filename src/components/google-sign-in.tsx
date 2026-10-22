@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { INTENT_COOKIE, INTENT_MAX_AGE_SECONDS, type AccountType } from "@/lib/account-type";
 import { createClient } from "@/lib/supabase/client";
 
 /** Google's "G", in its own colours (a brand mark, so it doesn't follow the theme). */
@@ -17,7 +18,7 @@ function GoogleMark() {
 }
 
 /** "Continue with Google": sends the browser to Google, which sends it back to /auth/callback. */
-export function GoogleSignIn() {
+export function GoogleSignIn({ as, signup = false }: { as: AccountType; signup?: boolean }) {
   const params = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(params.get("error") === "oauth" ? "Google sign-in didn't finish. Please try again." : null);
@@ -25,6 +26,8 @@ export function GoogleSignIn() {
   async function start() {
     setBusy(true);
     setError(null);
+    // Which door this was, kept across the trip to Google so the right first screen follows.
+    document.cookie = `${INTENT_COOKIE}=${as}; path=/; max-age=${INTENT_MAX_AGE_SECONDS}; samesite=lax`;
     const { error } = await createClient().auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
@@ -45,7 +48,7 @@ export function GoogleSignIn() {
       </div>
       <button type="button" className="btn w-full justify-center gap-2.5 py-2.5" onClick={() => void start()} disabled={busy}>
         <GoogleMark />
-        {busy ? "Opening Google…" : "Continue with Google"}
+        {busy ? "Opening Google…" : signup ? "Sign up with Google" : "Continue with Google"}
       </button>
       {error && (
         <p role="alert" className="text-sm text-danger">
