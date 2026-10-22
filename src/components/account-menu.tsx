@@ -3,7 +3,7 @@
 import { useRef, type ReactNode } from "react";
 
 /** On a phone the account links (Team, Profile, Log out) sit in one small menu, which closes when one is chosen. */
-export function AccountMenu({ badge = 0, children }: { badge?: number; children: ReactNode }) {
+export function AccountMenu({ badge = 0, who = null, children }: { badge?: number; /** Who is signed in, shown at the top of the menu. */ who?: string | null; children: ReactNode }) {
   const menu = useRef<HTMLDetailsElement>(null);
   return (
     <details ref={menu} className="relative md:hidden">
@@ -21,6 +21,7 @@ export function AccountMenu({ badge = 0, children }: { badge?: number; children:
           if ((e.target as HTMLElement).closest("a, button")) menu.current?.removeAttribute("open");
         }}
       >
+        {who && <p className="border-b border-line px-2 pb-2 pt-1 font-medium text-muted">{who}</p>}
         {children}
       </div>
     </details>

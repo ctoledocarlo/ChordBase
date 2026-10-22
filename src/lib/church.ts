@@ -2,7 +2,16 @@ import { cache } from "react";
 import { isRole, type Role } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 
-export type Church = { id: string; name: string; slug: string; /** What the signed-in login is in this church. */ role: Role };
+export type Church = {
+  id: string;
+  name: string;
+  slug: string;
+  /** What the signed-in login is in this church. */
+  role: Role;
+  /** The signed-in person's own name, if they have given it. */
+  firstName: string;
+  lastName: string;
+};
 
 /**
  * Which church the signed-in login belongs to, and whether finding out failed. `church` is null when signed out or
@@ -14,13 +23,16 @@ export const getMembership = cache(async (): Promise<{ church: Church | null; fa
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims) return { church: null, failed: false };
 
-  type Row = { role?: string; church: Omit<Church, "role"> | null };
-  let { data, error } = await supabase.from("church_accounts").select("role, church:churches(id, name, slug)").maybeSingle<Row>();
+  type Row = { role?: string; first_name?: string; last_name?: string; church: Pick<Church, "id" | "name" | "slug"> | null };
+  let { data, error } = await supabase.from("church_accounts").select("role, first_name, last_name, church:churches(id, name, slug)").maybeSingle<Row>();
   // 42703 is "no such column": the membership update hasn't been run, and every login that exists is its church's own.
   if (error?.code === "42703") ({ data, error } = await supabase.from("church_accounts").select("church:churches(id, name, slug)").maybeSingle<Row>());
   if (error) return { church: null, failed: true };
 
-  return { church: data?.church ? { ...data.church, role: isRole(data.role) ? data.role : "church" } : null, failed: false };
+  return {
+    church: data?.church ? { ...data.church, role: isRole(data.role) ? data.role : "church", firstName: data.first_name ?? "", lastName: data.last_name ?? "" } : null,
+    failed: false,
+  };
 });
 
 /**

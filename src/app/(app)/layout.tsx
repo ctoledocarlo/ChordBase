@@ -8,8 +8,9 @@ import { AccountMenu } from "@/components/account-menu";
 import { JoinChurch } from "@/components/join-church";
 import { isAccountType } from "@/lib/account-type";
 import { getMembership } from "@/lib/church";
+import { identityLabel } from "@/lib/identity";
 import { countRequests, getMyApplication } from "@/lib/members";
-import { ROLE_LABELS, can } from "@/lib/roles";
+import { can } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
@@ -54,16 +55,14 @@ async function ChurchBar() {
       <LogoutButton action={signOut} />
     </>
   );
+  const who = church ? identityLabel({ churchName: church.name, role: church.role, firstName: church.firstName, lastName: church.lastName }) : null;
   return (
     <div className="flex items-center gap-3 text-sm">
-      {church && (
-        <span className="hidden font-medium text-muted lg:inline">
-          {church.name}
-          {church.role !== "church" && ` · ${ROLE_LABELS[church.role]}`}
-        </span>
-      )}
+      {who && <span className="hidden max-w-[22rem] truncate font-medium text-muted lg:inline">{who}</span>}
       <div className="hidden items-center gap-3 md:flex">{links}</div>
-      <AccountMenu badge={waiting}>{links}</AccountMenu>
+      <AccountMenu badge={waiting} who={who}>
+        {links}
+      </AccountMenu>
     </div>
   );
 }
