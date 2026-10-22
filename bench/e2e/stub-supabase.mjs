@@ -99,6 +99,16 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     { id: "00000000-0000-4000-8000-0000000000d1", name: "Maria", range_low: "G3", range_high: "D5" },
     { id: "00000000-0000-4000-8000-0000000000d2", name: "Tom", range_low: "C3", range_high: "A4" },
   ];
+  // Joining a church: whether the signed-in login is in one, its application, and who is waiting.
+  const join = {
+    linked: true,
+    application: null,
+    requests: [{ id: "00000000-0000-4000-8000-0000000000f1", user_id: "00000000-0000-4000-8000-0000000000f2", email: "maria@example.com", first_name: "Maria", last_name: "Reyes", ministries: ["stage:keys", "stage:vocals"], created_at: new Date().toISOString() }],
+    members: [
+      { user_id: IDS.user, email: "bench@example.com", first_name: "", last_name: "", ministries: [], role: "church", joined_at: new Date().toISOString() },
+      { user_id: "00000000-0000-4000-8000-0000000000f3", email: "tom@example.com", first_name: "Tom", last_name: "Okafor", ministries: ["media"], role: "member", joined_at: new Date().toISOString() },
+    ],
+  };
   // What the phone remote changes: kept so a later read shows it.
   const setlistState = { remote_pin: null, remote_started_at: null, remote_expires_at: null, active_item_id: null, timer_ends_at: null };
   const taskDone = new Map();
@@ -153,6 +163,13 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
       return res.end(JSON.stringify({ cookie: sessionCookie(), setlist: IDS.setlist, song: IDS.song }));
     }
 
+    // For trying the join screen: /__linked?on=0 makes the signed-in login belong to no church.
+    if (url.pathname === "/__linked") {
+      join.linked = url.searchParams.get("on") !== "0";
+      res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" });
+      return res.end(JSON.stringify({ linked: join.linked }));
+    }
+
     if (url.pathname === "/auth/v1/.well-known/jwks.json") {
       // The signing keys are read once per server, not per request.
       return send(200, { keys: [jwk] });
@@ -201,6 +218,34 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
         return send(200, { locked });
       }
       if (table === "rpc/login_ok") return send(204);
+      if (table === "rpc/search_churches") return send(200, String(parsed.p_q ?? "").toLowerCase().includes("bench") ? [{ id: IDS.church, name: "Bench church" }] : []);
+      if (table === "rpc/my_application") return send(200, join.application);
+      if (table === "rpc/apply_to_church") {
+        join.application = { id: randomUUID(), status: "pending", church_id: parsed.p_church, church_name: "Bench church", first_name: parsed.p_first, last_name: parsed.p_last, ministries: parsed.p_ministries, created_at: new Date().toISOString() };
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/cancel_application") {
+        join.application = null;
+        return send(204);
+      }
+      if (table === "rpc/church_requests") return send(200, join.requests);
+      if (table === "rpc/church_members") return send(200, join.members);
+      if (table === "rpc/decide_application") {
+        const r = join.requests.find((x) => x.id === parsed.p_id);
+        join.requests = join.requests.filter((x) => x.id !== parsed.p_id);
+        if (r && parsed.p_approve) join.members.push({ user_id: r.user_id, email: r.email, first_name: r.first_name, last_name: r.last_name, ministries: r.ministries, role: "member", joined_at: new Date().toISOString() });
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/set_member_role") {
+        const m = join.members.find((x) => x.user_id === parsed.p_user);
+        if (m) m.role = parsed.p_role;
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/remove_member") {
+        join.members = join.members.filter((x) => x.user_id !== parsed.p_user);
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/update_my_profile") return send(200, { ok: true });
       if (table === "rpc/merge_songs") return send(204);
       if (req.method === "PATCH" && table === "setlists" && !url.searchParams.has("church_id")) {
         for (const k of Object.keys(setlistState)) if (k in parsed) setlistState[k] = parsed[k];
@@ -239,7 +284,12 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
       return send(201, object ? row : [row]);
     }
 
-    if (table === "church_accounts") return send(200, object ? { church } : [{ church }]);
+    if (table === "church_accounts") {
+      if (!join.linked) return send(200, object ? null : []);
+      const own = select.includes("first_name") ? { first_name: "Ana", last_name: "Lopez", ministries: ["stage:drums"], role: "church" } : { role: "church", church };
+      return send(200, object ? own : [own]);
+    }
+    if (table === "church_applications") return send(200, [], { "content-range": `*/${join.requests.length}` });
     if (table === "rpc/song_facets") return send(200, facets);
     if (table === "chord_shortcuts") return send(200, [{ id: randomUUID(), chord: "G" }, { id: randomUUID(), chord: "D" }]);
     if (table === "setlist_messages") return send(200, messages);

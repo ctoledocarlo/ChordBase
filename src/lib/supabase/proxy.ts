@@ -3,9 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { supabaseEnv } from "./env";
 
 // Reachable without being signed in. /auth/confirm exchanges the emailed
-// reset-link token for a session, so it must be open.
+// reset-link token for a session, and /auth/callback the code Google sends back, so both must be open.
 // /r is the phone remote: it has no login, and asks for the setlist's PIN itself.
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm", "/welcome", "/r"];
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/auth/confirm", "/auth/callback", "/welcome", "/r"];
 // Signed-in users have no reason to see these.
 const GUEST_ONLY_PATHS = ["/login", "/forgot-password"];
 
