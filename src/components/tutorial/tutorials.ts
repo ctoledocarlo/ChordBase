@@ -263,6 +263,13 @@ const PAGES: Tutorial[] = [
         optional: true,
       },
       {
+        target: "song-history-link",
+        sidebar: true,
+        title: "Version history",
+        body: "Every save that changes this song keeps how it was before. Open the history to compare an earlier version with the song now, and put it back if you like.",
+        optional: true,
+      },
+      {
         target: "song-add-setlist",
         sidebar: true,
         title: "Add to setlist",
@@ -396,10 +403,17 @@ const PAGES: Tutorial[] = [
         optional: true,
       },
       {
+        target: "setlist-remote-fold",
+        sidebar: true,
+        title: "Phone remote",
+        body: "Start the remote to get a PIN and a QR code. Anyone in the band can join from their own phone with that PIN, with no login, pick their instrument, and read its notes. The guide “The phone remote” explains more.",
+        optional: true,
+      },
+      {
         target: "setlist-share",
         sidebar: true,
-        title: "Share, print and keep offline",
-        body: "Open the phone remote, print or save the setlist as a PDF, add the service to the history, or keep this setlist for offline use on this device.",
+        title: "Print and keep offline",
+        body: "Print or save the setlist as a PDF, add the service to the history, or keep this setlist for offline use on this device.",
         optional: true,
       },
       {
@@ -610,6 +624,44 @@ const FUNCTIONS: Tutorial[] = [
         rail: true,
         title: "5. The service clock",
         body: "Press the time to set how long the set has, or when it ends. Every screen shows a countdown that turns amber in the last five minutes.",
+        optional: true,
+      },
+    ],
+  },
+  {
+    id: "fn-remote",
+    kind: "function",
+    title: "The phone remote",
+    summary: "Let the band follow and control the setlist from their phones, with a PIN",
+    pages: ["setlist"],
+    steps: [
+      {
+        title: "What it is for",
+        body: "A phone remote lets each musician see what is on stage, read the notes for their own instrument, and move to the next song, without a login and without a cable. There is no limit to how many phones can join.",
+      },
+      {
+        target: "setlist-remote-fold",
+        sidebar: true,
+        title: "1. Start it",
+        body: "Open “Phone remote” in the sidebar and press Start. You get a six-digit PIN and a QR code. Nothing can be joined until you start it.",
+      },
+      {
+        title: "2. The band joins",
+        body: "They scan the QR code (or open the link), then type the PIN. A phone stays joined for the day. Too many wrong PINs makes the remote wait a while before it accepts another try.",
+      },
+      {
+        title: "3. Pick the instrument",
+        body: "On the phone, “This phone is” chooses the instrument. The phone then shows the shared notes and that instrument's notes for the song on stage and the one after it, and that instrument's checklist.",
+      },
+      {
+        title: "4. Control the service",
+        body: "Previous and Next change the song on stage for every screen. Tapping a song sends it there, the key buttons change its key, and the time sets the countdown.",
+      },
+      {
+        target: "setlist-remote-fold",
+        sidebar: true,
+        title: "5. New PIN or switch it off",
+        body: "“New PIN” sends everyone back to the PIN screen, for when the PIN got shared too widely. “Switch the remote off” does the same and stops anyone joining until you start it again.",
         optional: true,
       },
     ],

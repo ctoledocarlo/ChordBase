@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { getCurrentChurch, isSignedIn } from "@/lib/church";
 import { DEFAULT_KEEP_MONTHS, expiryFrom, isKeepMonths } from "@/lib/setlist-expiry";
-import { deriveSong } from "@/lib/setlist-derive";
-import { defaultSettings, normalizeSettings, validSettings } from "@/lib/setlist-settings";
+import { recordPlayWith } from "@/lib/record-play";
+import { defaultSettings, validSettings } from "@/lib/setlist-settings";
 import type { TeamExtras } from "@/lib/setlist-team";
 import {
   ITEM_COLUMNS,
@@ -316,40 +316,8 @@ export async function setActiveItem(setlistId: string, itemId: string | null, cl
     .update({ active_item_id: itemId, edited_by: screenId(clientId) })
     .eq("id", setlistId);
   if (error) return { error: "Couldn't change the song on stage." };
-  if (itemId) after(() => recordPlay(setlistId, itemId, localDay));
+  if (itemId) after(async () => recordPlayWith(await createClient(), setlistId, itemId, localDay));
   return {};
-}
-
-/** The day to file a play under: the Media screen's own day when it is believable, else today's date on the server. */
-function playDay(localDay: string | undefined): string {
-  const today = new Date().toISOString().slice(0, 10);
-  if (!localDay || !/^\d{4}-\d{2}-\d{2}$/.test(localDay)) return today;
-  const apart = Math.abs(Date.parse(localDay) - Date.parse(today)) / 86_400_000;
-  return apart <= 2 ? localDay : today;
-}
-
-async function recordPlay(setlistId: string, itemId: string, localDay: string | undefined) {
-  try {
-    const supabase = await createClient();
-    const [{ data: setlist }, { data: item }] = await Promise.all([
-      supabase.from("setlists").select("name").eq("id", setlistId).maybeSingle<{ name: string }>(),
-      supabase
-        .from("setlist_items")
-        .select("song_id, settings, songs(original_key, default_capo)")
-        .eq("id", itemId)
-        .eq("setlist_id", setlistId)
-        .maybeSingle(),
-    ]);
-    const row = item as unknown as { song_id: string; settings: unknown; songs: { original_key: string; default_capo: number } | null } | null;
-    if (!setlist || !row || !row.songs) return;
-    const key = deriveSong(row.songs.original_key, normalizeSettings(row.settings, row.songs.default_capo)).soundingKey;
-    // church_id comes from the column default; a second play of the same song on the same day changes nothing.
-    await supabase
-      .from("song_history")
-      .upsert({ song_id: row.song_id, played_on: playDay(localDay), setlist_name: setlist.name, key }, { onConflict: "song_id,played_on", ignoreDuplicates: true });
-  } catch (e) {
-    console.error("recordPlay failed", e);
-  }
 }
 
 /** Saves how one song leads into the next: suggested chords, typed-in chords, or none. */

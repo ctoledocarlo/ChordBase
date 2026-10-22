@@ -99,6 +99,28 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     { id: "00000000-0000-4000-8000-0000000000d1", name: "Maria", range_low: "G3", range_high: "D5" },
     { id: "00000000-0000-4000-8000-0000000000d2", name: "Tom", range_low: "C3", range_high: "A4" },
   ];
+  // What the phone remote changes: kept so a later read shows it.
+  const setlistState = { remote_pin: null, active_item_id: null, timer_ends_at: null };
+  const taskDone = new Map();
+  const failures = new Map();
+  const bodyAt = (n) => fullSong.body.split("\n").slice(0, 8 + n).join("\n");
+  const versions = Array.from({ length: 3 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-00000000f00${i}`,
+    song_id: IDS.song,
+    saved_at: new Date(Date.now() - (i + 1) * 36e5).toISOString(),
+    title: fullSong.title,
+    artist: fullSong.artist,
+    original_key: i === 1 ? "A" : fullSong.original_key,
+    default_capo: 0,
+    tempo: fullSong.tempo,
+    time_signature: "4/4",
+    ccli_number: "",
+    tags: fullSong.tags,
+    melody_low: "E3",
+    melody_high: "D4",
+    links: fullSong.links,
+    body: bodyAt(i * 2),
+  }));
   const setlistRow = (i) => ({ id: i === 0 ? IDS.setlist : randomUUID(), name: `Sunday ${i}`, service_date: futureDate(i - 10), expires_at: futureDate(20), active_item_id: null, timer_ends_at: null, setlist_items: [{ count: 14 }] });
   const setlists = Array.from({ length: 60 }, (_, i) => setlistRow(i));
   const listPage = Array.from({ length: 25 }, (_, i) => songRow(i, false));
@@ -158,7 +180,45 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     if (req.method === "POST" || req.method === "PATCH") {
       let sent = "";
       for await (const chunk of req) sent += chunk;
+      let parsed = {};
+      try {
+        parsed = JSON.parse(sent || "{}");
+      } catch {
+        // Not JSON.
+      }
+      // The login guard's counters (the phone remote's PIN guesses use them too).
+      if (table === "rpc/login_gate") {
+        const locked = (parsed.p_keys ?? []).filter((k) => (failures.get(k) ?? 0) >= 900).map((k) => ({ key: k, seconds: 900 }));
+        return send(200, { locked, had_fails: false });
+      }
+      if (table === "rpc/login_failed") {
+        const locked = [];
+        (parsed.p_keys ?? []).forEach((k, i) => {
+          const n = (failures.get(k) ?? 0) + 1;
+          failures.set(k, n >= (parsed.p_limits?.[i] ?? 5) ? 900 : n);
+          if (n >= (parsed.p_limits?.[i] ?? 5)) locked.push({ key: k, seconds: 900 });
+        });
+        return send(200, { locked });
+      }
+      if (table === "rpc/login_ok") return send(204);
       if (table === "rpc/merge_songs") return send(204);
+      if (req.method === "PATCH" && table === "setlists" && !url.searchParams.has("church_id")) {
+        for (const k of Object.keys(setlistState)) if (k in parsed) setlistState[k] = parsed[k];
+        if (!(req.headers.prefer ?? "").includes("return=representation")) return send(204);
+        return send(200, object ? { ...setlistState } : [{ ...setlistState }]);
+      }
+      if (req.method === "PATCH" && table === "setlist_tasks" && "done" in parsed) {
+        taskDone.set((url.searchParams.get("id") ?? "").replace("eq.", ""), parsed);
+        return send(200, [{ id: "ok" }]);
+      }
+      if (req.method === "PATCH" && table === "songs") {
+        // The database keeps how the song was before a change.
+        const before = { ...fullSong };
+        for (const k of ["id", "church_id", "updated_at"]) delete before[k];
+        versions.unshift({ id: randomUUID(), song_id: IDS.song, saved_at: new Date().toISOString(), ...before });
+        Object.assign(fullSong, parsed);
+        return send(200, [{ id: IDS.song }]);
+      }
       if (!(req.headers.prefer ?? "").includes("return=representation")) return send(204);
       let body = {};
       try {
@@ -185,7 +245,15 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     if (table === "setlist_messages") return send(200, messages);
     if (table === "setlist_views") return send(200, views);
     if (table === "setlist_notes") return send(200, notes);
-    if (table === "setlist_tasks") return send(200, tasks);
+    if (table === "setlist_tasks") return send(200, tasks.map((t) => (taskDone.has(t.id) ? { ...t, ...taskDone.get(t.id) } : t)));
+    if (table === "song_versions") {
+      const wanted = (url.searchParams.get("id") ?? "").replace("eq.", "");
+      if (wanted) {
+        const v = versions.find((x) => x.id === wanted);
+        return send(200, object ? (v ?? null) : v ? [v] : []);
+      }
+      return send(200, versions);
+    }
     if (table === "singers") return send(200, singers);
     if (table === "song_history") {
       const plays = listPage.slice(0, 12).flatMap((s, i) => [
@@ -201,10 +269,16 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
     }
     if (table === "setlists") {
       if (req.method === "DELETE") return send(204);
-      if (url.searchParams.has("id")) return send(200, object ? setlistRow(0) : [setlistRow(0)]);
+      if (url.searchParams.has("id")) {
+        const row = { ...setlistRow(0), ...setlistState, church_id: IDS.church };
+        return send(200, object ? row : [row]);
+      }
       return send(200, setlists);
     }
-    if (table === "setlist_items") return send(200, setlistItems);
+    if (table === "setlist_items") {
+      const wanted = (url.searchParams.get("id") ?? "").replace("eq.", "");
+      return send(200, wanted ? setlistItems.filter((i) => i.id === wanted) : setlistItems);
+    }
     return send(404, { message: `stub has no ${table}` });
   });
 

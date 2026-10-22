@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isSignedIn } from "@/lib/church";
 import { noteNumber } from "@/lib/key-finder";
 import { SINGER_COLUMNS, type Singer } from "@/lib/setlist-team";
+import { VERSION_COLUMNS, restoreFields, type SongVersion } from "@/lib/song-versions";
 import { forgetSongFacets } from "@/lib/songs";
 import { tidyTags } from "@/lib/tags";
 import { createClient } from "@/lib/supabase/server";
@@ -86,4 +87,28 @@ export async function renameArtists(from: string[], to: string): Promise<{ chang
   forgetSongFacets();
   revalidatePath("/", "layout");
   return { changed: data?.length ?? 0 };
+}
+
+// ---- Earlier versions ------------------------------------------------------------------------------------
+
+/**
+ * Puts a song back the way it was in an earlier version. The song as it is now is kept as a version first (the database
+ * does that on every change), so a restore can be undone the same way.
+ */
+export async function restoreSongVersion(songId: string, versionId: string): Promise<{ error?: string }> {
+  if (!(await isSignedIn())) return fail(NOT_SIGNED_IN);
+  const supabase = await createClient();
+  const { data: version } = await supabase
+    .from("song_versions")
+    .select(VERSION_COLUMNS)
+    .eq("id", versionId)
+    .eq("song_id", songId)
+    .maybeSingle<SongVersion>();
+  if (!version) return fail("That version is no longer there.");
+  const { data, error } = await supabase.from("songs").update(restoreFields(version)).eq("id", songId).select("id");
+  if (error || !data?.length) return fail("Couldn't restore that version. Please try again.");
+  forgetSongFacets();
+  revalidatePath("/");
+  revalidatePath(`/songs/${songId}`);
+  return {};
 }

@@ -33,6 +33,7 @@ import { KeyForSinger } from "./singers";
 import { keepForOffline } from "./offline-support";
 import { ServiceClock } from "./service-clock";
 import { SongLinkList } from "./song-extras";
+import { RemotePanel } from "./remote-panel";
 import { Checklist } from "./team-checklist";
 import { NotesCard, NotesEditor, ViewManager } from "./team-notes";
 import { useTeam } from "./use-team";
@@ -844,24 +845,11 @@ export function SetlistPlayer({
         >
           <Checklist team={team} manage />
         </Fold>
+        <Fold title="Phone remote" tour="setlist-remote-fold">
+          <RemotePanel setlistId={setlist.id} />
+        </Fold>
         <Fold title="Share, print and history" tour="setlist-share">
           <div className="grid gap-2">
-            <Link href={`/setlists/${setlist.id}/remote`} className="btn w-full">
-              Open the phone remote
-            </Link>
-            <button
-              type="button"
-              className="btn w-full"
-              onClick={() => {
-                const url = `${window.location.origin}/setlists/${setlist.id}/remote`;
-                void navigator.clipboard?.writeText(url).then(
-                  () => toast("Remote link copied. Open it on a phone that is signed in.", { tone: "success" }),
-                  () => toast(url),
-                );
-              }}
-            >
-              Copy the remote link
-            </button>
             <Link href={`/setlists/${setlist.id}/print`} className="btn w-full">
               Print or save as PDF
             </Link>
@@ -880,7 +868,7 @@ export function SetlistPlayer({
             type="button"
             className="btn w-full"
             onClick={async () => {
-              const kept = await keepForOffline([window.location.pathname, `/setlists/${setlist.id}/remote`, `/setlists/${setlist.id}/print`, "/setlists", "/"]);
+              const kept = await keepForOffline([window.location.pathname, `/setlists/${setlist.id}/print`, "/setlists", "/"]);
               toast(
                 kept > 0 ? "Kept for offline use. This setlist will open on this device without a connection." : "Couldn't keep it just now. Open it once more while online and try again.",
                 { tone: kept > 0 ? "success" : "error" },

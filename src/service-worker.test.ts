@@ -149,6 +149,8 @@ describe("the service worker", () => {
     expect(await sw.ask("/setlists/1", { method: "POST", mode: "same-origin" })).toBeNull();
     expect(await sw.ask("/login", { mode: "navigate" })).toBeNull();
     expect(await sw.ask("/auth/confirm?x=1", { mode: "navigate" })).toBeNull();
+    // The phone remote is guarded by a PIN, so a copy of it must never be kept or shown without one.
+    expect(await sw.ask("/r/6f1d6d5a-1c52-4a0e-8a6e-0d3a6d2d0c11", { mode: "navigate" })).toBeNull();
     expect(await sw.ask("/setlists/1?_rsc=a", { headers: { RSC: "1", "Next-Router-Prefetch": "1" } })).toBeNull();
     expect(await sw.ask("/api/other", { mode: "same-origin" })).toBeNull();
   });

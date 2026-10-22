@@ -61,6 +61,7 @@ const env = {
   ...process.env,
   NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${STUB_PORT}`,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "bench-anon-key",
+  SUPABASE_SERVICE_ROLE_KEY: "bench-service-key",
   NEXT_TELEMETRY_DISABLED: "1",
 };
 const nextBin = join(repo, "node_modules/next/dist/bin/next");

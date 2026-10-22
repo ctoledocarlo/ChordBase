@@ -1,4 +1,5 @@
 import { connection } from "next/server";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AddToSetlist } from "@/components/add-to-setlist";
@@ -58,6 +59,9 @@ async function Song({ params }: { params: PageProps<"/songs/[id]">["params"] }) 
             songTitle={song.title}
             setlists={setlists}
           />
+          <Link href={`/songs/${song.id}/history`} data-tour="song-history-link" className="btn w-full">
+            Version history
+          </Link>
           <DeleteButton
             action={deleteSong}
             id={song.id}

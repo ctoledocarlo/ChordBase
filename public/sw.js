@@ -33,8 +33,8 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-/** Pages that are about signing in are never kept. */
-const NEVER = [/^\/auth\//, /^\/login/, /^\/forgot-password/, /^\/reset-password/];
+/** Pages that are about signing in, and the phone remote (which is checked by a PIN), are never kept. */
+const NEVER = [/^\/r\//, /^\/auth\//, /^\/login/, /^\/forgot-password/, /^\/reset-password/];
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;

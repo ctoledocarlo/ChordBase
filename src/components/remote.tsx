@@ -1,65 +1,188 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { getSetlistState, saveItemSettings, sendMessage, setActiveItem } from "@/app/(app)/setlists/actions";
-import { setServiceTimer } from "@/app/(app)/setlists/team-actions";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { getRemoteState, joinRemote, leaveRemote, remoteGoTo, remoteSaveSettings, remoteSendMessage, remoteSetTaskDone, remoteSetTimer } from "@/app/r/actions";
+import { cleanPin } from "@/lib/remote-token";
 import { deriveSong } from "@/lib/setlist-derive";
-import { taskProgress, type TeamExtras } from "@/lib/setlist-team";
 import { mergeRemote } from "@/lib/setlist-sync";
-import type { ChatMessage, Setlist, SetlistItem } from "@/lib/setlists";
-import { Modal } from "./modal";
+import { everyoneView, noteFor, notesToShow, taskProgress, tasksFor, type SetlistTask } from "@/lib/setlist-team";
+import type { ChatMessage, SetlistItem } from "@/lib/setlists";
+import type { RemoteState } from "@/lib/remote-access";
 import { ServiceClock } from "./service-clock";
 import { SetlistChat } from "./setlist-chat";
-import { Checklist } from "./team-checklist";
 import { useToast } from "./toast";
-import { newScreenId, useSetlistSync } from "./use-setlist-sync";
-import { useTeam } from "./use-team";
+import { newScreenId } from "./use-setlist-sync";
+import { useStoredText } from "./use-stored-flag";
 
 const SAVE_DELAY_MS = 400;
+/** How often the phone asks what changed. Slower while it is just sitting there. */
+const POLL_MS = 3000;
 
 function localDay(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** The screen a phone sees before it has joined: a PIN to type. */
+export function RemotePin({ setlistId, unavailable = false }: { setlistId: string; unavailable?: boolean }) {
+  const router = useRouter();
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  function join() {
+    setError(null);
+    start(async () => {
+      const res = await joinRemote(setlistId, pin);
+      if ("error" in res) return setError(res.error);
+      router.refresh();
+    });
+  }
+
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center gap-5 p-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Join the remote</h1>
+        <p className="mt-2 text-muted">Type the 6-digit PIN shown on the Media screen. No login needed.</p>
+      </div>
+      {unavailable ? (
+        <p role="alert" className="text-danger">
+          The remote isn&apos;t set up on this server yet.
+        </p>
+      ) : (
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            join();
+          }}
+        >
+          <label className="block">
+            <span className="label">PIN</span>
+            <input
+              value={pin}
+              onChange={(e) => setPin(cleanPin(e.target.value))}
+              inputMode="numeric"
+              autoComplete="off"
+              autoFocus
+              maxLength={6}
+              placeholder="••••••"
+              aria-describedby={error ? "pin-error" : undefined}
+              className="field text-center font-mono text-3xl tracking-[0.4em]"
+            />
+          </label>
+          {error && (
+            <p id="pin-error" role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <button type="submit" className="btn btn-primary min-h-12 w-full text-lg" disabled={pending || pin.length !== 6}>
+            {pending ? "Joining…" : "Join"}
+          </button>
+        </form>
+      )}
+    </main>
+  );
+}
+
 /**
- * A controller for a phone: big Previous and Next buttons for the song on stage, a tap on any song to send it
- * there, the key of the song on stage, the service clock, the checklist and the chat. It takes over the screen
- * and keeps the phone awake while it is open. Changes go to every other screen straight away.
+ * A controller for a phone, joined with the PIN (no login): big Previous and Next buttons for the song on stage,
+ * the notes for this phone's own instrument, a tap on any song to send it there, the key of the song on stage, the
+ * service clock, the checklist and the chat. As many phones as you like can be joined at once. It keeps the phone
+ * awake, and asks the server every few seconds what the other screens changed.
  */
-export function Remote({
-  setlist,
-  initialItems,
-  initialMessages,
-  initialExtras,
-}: {
-  setlist: Setlist;
-  initialItems: SetlistItem[];
-  initialMessages: ChatMessage[];
-  initialExtras: TeamExtras;
-}) {
+export function Remote({ setlistId, initial }: { setlistId: string; initial: RemoteState }) {
   const router = useRouter();
   const toast = useToast();
   const [screenId] = useState(newScreenId);
-  const team = useTeam(setlist.id, screenId, initialExtras);
-  const [items, setItems] = useState(initialItems);
-  const [activeId, setActiveId] = useState(setlist.active_item_id);
-  const [messages, setMessages] = useState(initialMessages);
-  const [timerEndsAt, setTimerEndsAt] = useState(setlist.timer_ends_at);
-  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [items, setItems] = useState<SetlistItem[]>(initial.items);
+  const [activeId, setActiveId] = useState(initial.setlist.active_item_id);
+  const [messages, setMessages] = useState<ChatMessage[]>(initial.messages);
+  const [timerEndsAt, setTimerEndsAt] = useState(initial.setlist.timer_ends_at);
+  const [extras, setExtras] = useState(initial.extras);
+  const [status, setStatus] = useState<"live" | "offline">("live");
   const [chatOpen, setChatOpen] = useState(false);
+  // Which instrument this phone is, for this setlist (remembered on the phone, and the same choice a Stage screen makes).
+  const [chosen, setChosen] = useStoredText(`chordbase.stageView.${setlistId}`, "");
 
-  const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  });
+  const { views, notes, tasks } = extras;
+  const everyone = everyoneView(views);
+  const myView = views.find((v) => v.id === chosen) ?? everyone ?? null;
+  const myViewId = myView?.id ?? null;
 
   const stageId = activeId && items.some((i) => i.id === activeId) ? activeId : (items[0]?.id ?? null);
   const stageIndex = items.findIndex((i) => i.id === stageId);
   const onStage = stageIndex >= 0 ? items[stageIndex] : null;
   const next = stageIndex >= 0 ? items[stageIndex + 1] : undefined;
+
+  // What was changed on this phone and not yet saved, so a poll doesn't undo it; and a counter that tells a poll it is out of date.
+  const pendingIds = useRef(new Set<string>());
+  const epoch = useRef(0);
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  });
+
+  /** A refusal means the PIN was changed or the remote switched off: back to the PIN screen. */
+  function refused(res: unknown): boolean {
+    if (res && typeof res === "object" && "denied" in res) {
+      toast((res as { error?: string }).error ?? "The remote was switched off.", { tone: "error" });
+      router.refresh();
+      return true;
+    }
+    return false;
+  }
+
+  // Ask the server what changed, every few seconds while the phone is on screen.
+  useEffect(() => {
+    let stopped = false;
+    let running = false;
+    async function poll() {
+      if (running || document.visibilityState !== "visible") return;
+      running = true;
+      const seen = epoch.current;
+      try {
+        const res = await getRemoteState(setlistId);
+        if (stopped) return;
+        if (refused(res)) return;
+        if ("state" in res && seen === epoch.current) {
+          const state = res.state;
+          setStatus("live");
+          setMessages((list) => {
+            const have = new Set(list.map((m) => m.id));
+            const fresh = state.messages.filter((m) => !have.has(m.id));
+            return fresh.length === 0 ? list : [...list, ...fresh].sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-200);
+          });
+          setExtras((now) => ({
+            views: state.extras.views,
+            notes: state.extras.notes,
+            // A tick still being saved stays as it is here.
+            tasks: state.extras.tasks.map((t) => (pendingIds.current.has(t.id) ? (now.tasks.find((x) => x.id === t.id) ?? t) : t)),
+          }));
+          setTimerEndsAt(state.setlist.timer_ends_at);
+          setActiveId(state.setlist.active_item_id);
+          setItems((local) => mergeRemote(local, state.items, { pendingIds: pendingIds.current, editingId: null }).items);
+        }
+      } catch {
+        // No connection just now; it tries again on the next beat.
+        if (!stopped) setStatus("offline");
+      } finally {
+        running = false;
+      }
+    }
+    const timer = setInterval(() => void poll(), POLL_MS);
+    const again = () => void poll();
+    document.addEventListener("visibilitychange", again);
+    window.addEventListener("online", again);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", again);
+      window.removeEventListener("online", again);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `refused` only uses stable things (router, toast).
+  }, [setlistId]);
 
   // Keep the phone awake while the remote is open.
   useEffect(() => {
@@ -84,10 +207,22 @@ export function Remote({
     };
   }, []);
 
+  /** Runs a change on the server; a problem is shown, and a refusal sends the phone back to the PIN. */
+  async function run(change: Promise<{ error?: string } | { denied: true; error: string }>) {
+    epoch.current++;
+    const res = await change;
+    epoch.current++;
+    if (refused(res)) return false;
+    if ("error" in res && res.error) {
+      toast(res.error, { tone: "error" });
+      return false;
+    }
+    return true;
+  }
+
   async function goTo(id: string) {
     setActiveId(id);
-    const res = await setActiveItem(setlist.id, id, screenId, localDay());
-    if (res.error) toast(res.error, { tone: "error" });
+    await run(remoteGoTo(setlistId, id, screenId, localDay()));
   }
 
   // The key of the song on stage, saved a moment after the last tap.
@@ -95,118 +230,137 @@ export function Remote({
   function stepKey(delta: number) {
     if (!onStage) return;
     const settings = { ...onStage.settings, semitones: (onStage.settings.semitones + delta + 12) % 12 };
-    setItems((list) => list.map((i) => (i.id === onStage.id ? { ...i, settings } : i)));
+    const id = onStage.id;
+    pendingIds.current.add(id);
+    setItems((list) => list.map((i) => (i.id === id ? { ...i, settings } : i)));
     clearTimeout(keyTimer.current);
     keyTimer.current = setTimeout(async () => {
-      const res = await saveItemSettings(onStage.id, settings, screenId);
-      if (res.error) toast(res.error, { tone: "error" });
+      await run(remoteSaveSettings(setlistId, id, settings, screenId));
+      pendingIds.current.delete(id);
     }, SAVE_DELAY_MS);
   }
   useEffect(() => () => clearTimeout(keyTimer.current), []);
 
   async function changeTimer(endsAt: string | null) {
     setTimerEndsAt(endsAt);
-    const res = await setServiceTimer(setlist.id, endsAt, screenId);
-    if (res.error) toast(res.error, { tone: "error" });
+    await run(remoteSetTimer(setlistId, endsAt, screenId));
   }
 
-  function addMessages(incoming: ChatMessage[]) {
-    setMessages((list) => {
-      const have = new Set(list.map((m) => m.id));
-      const fresh = incoming.filter((m) => !have.has(m.id));
-      return fresh.length === 0 ? list : [...list, ...fresh].sort((a, b) => a.created_at.localeCompare(b.created_at)).slice(-200);
-    });
+  async function tick(task: SetlistTask, done: boolean) {
+    pendingIds.current.add(task.id);
+    setExtras((e) => ({ ...e, tasks: e.tasks.map((t) => (t.id === task.id ? { ...t, done, done_by: done ? (myView?.kind === "instrument" ? myView.name : null) : null } : t)) }));
+    await run(remoteSetTaskDone(setlistId, task.id, done, myView?.kind === "instrument" ? myView.name : null, screenId));
+    pendingIds.current.delete(task.id);
   }
 
-  async function catchUp() {
-    const state = await getSetlistState(setlist.id);
-    if (!state) return;
-    addMessages(state.messages);
-    team.apply(state.extras);
-    setTimerEndsAt(state.setlist.timer_ends_at);
-    setActiveId(state.setlist.active_item_id);
-    setItems((local) => {
-      const merged = mergeRemote(local, state.items, { pendingIds: new Set(), editingId: null });
-      return merged.items;
-    });
+  async function leave() {
+    await leaveRemote(setlistId);
+    router.refresh();
   }
 
-  const sync = useSetlistSync(setlist.id, screenId, "media", {
-    catchUp: () => void catchUp(),
-    itemDeleted: (id) => setItems((list) => list.filter((i) => i.id !== id)),
-    setlistDeleted: () => router.replace("/setlists"),
-    message: (m) => addMessages([m]),
-    hasSong: (songId) => itemsRef.current.some((i) => i.song_id === songId),
-  });
-
-  const progress = taskProgress(team.tasks);
+  const myTasks = tasksFor(tasks, views, myViewId);
+  const progress = taskProgress(myTasks);
   const keyName = onStage ? deriveSong(onStage.song.original_key, onStage.settings).keyLabel : "";
+  const instruments = views.filter((v) => v.kind === "instrument");
+  const noteLabel = (view: { kind: string; name: string }) => (view.kind === "all" ? "Everyone" : view.name);
+
+  const stageNotes = onStage ? notesToShow(notes, views, onStage.id, myViewId) : [];
+  const nextNotes = next ? notesToShow(notes, views, next.id, myViewId) : [];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-background">
-      <div className="mx-auto flex min-h-full w-full max-w-md flex-col gap-4 p-4">
-        <header className="flex items-center gap-3">
-          <Link href={`/setlists/${setlist.id}`} className="btn flex-none">
-            ← Setlist
-          </Link>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium">{setlist.name}</p>
-            <p className="flex items-center gap-1.5 text-xs text-muted">
-              <span aria-hidden className={`h-2 w-2 rounded-full ${sync.status === "live" ? "bg-[#16a34a]" : sync.status === "offline" ? "bg-[#d97706]" : "bg-line"}`} />
-              {sync.status === "live" ? "Live" : sync.status === "offline" ? "Reconnecting…" : "Connecting…"}
-            </p>
-          </div>
-          <ServiceClock endsAt={timerEndsAt} canSet onSet={(t) => void changeTimer(t)} large />
-        </header>
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col gap-4 p-4">
+      <header className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{initial.setlist.name}</p>
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            <span aria-hidden className={`h-2 w-2 rounded-full ${status === "live" ? "bg-[#16a34a]" : "bg-[#d97706]"}`} />
+            {status === "live" ? "Live" : "Reconnecting…"}
+          </p>
+        </div>
+        <ServiceClock endsAt={timerEndsAt} canSet onSet={(t) => void changeTimer(t)} large />
+      </header>
 
-        <section data-tour="remote-stage" aria-label="On stage" className="rounded-2xl border border-line p-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">On stage</p>
-          {onStage ? (
-            <>
-              <p className="mt-1 text-2xl font-semibold leading-tight">{onStage.song.title}</p>
-              <p className="mt-1 font-mono text-sm text-muted">{keyName}</p>
-              {next && (
-                <p className="mt-3 border-t border-line pt-3 text-sm">
+      {instruments.length > 0 && (
+        <label className="flex items-center gap-3 rounded-xl border border-line px-3 py-2">
+          <span className="flex-none text-sm text-muted">This phone is</span>
+          <select className="field field-sm min-w-0 flex-1" value={myViewId ?? ""} onChange={(e) => setChosen(e.target.value)} aria-label="Which instrument this phone is">
+            {everyone && <option value={everyone.id}>Everyone (no instrument)</option>}
+            {instruments.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <section data-tour="remote-stage" aria-label="On stage" className="rounded-2xl border border-line p-4">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">On stage</p>
+        {onStage ? (
+          <>
+            <p className="mt-1 text-2xl font-semibold leading-tight">{onStage.song.title}</p>
+            <p className="mt-1 font-mono text-sm text-muted">{keyName}</p>
+            {stageNotes.length > 0 && (
+              <div className="mt-3 space-y-2 border-t border-line pt-3" aria-label="Notes for this song">
+                {stageNotes.map(({ view, body }) => (
+                  <div key={view.id}>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted">Notes · {noteLabel(view)}</p>
+                    <p className="whitespace-pre-wrap text-base">{body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {next && (
+              <div className="mt-3 border-t border-line pt-3 text-sm">
+                <p>
                   <span className="text-xs font-medium uppercase tracking-wide text-muted">Up next </span>
                   {next.song.title}
                 </p>
-              )}
-            </>
-          ) : (
-            <p className="mt-1 text-muted">Nothing in the setlist yet.</p>
-          )}
-        </section>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button type="button" className="btn min-h-16 text-lg" disabled={stageIndex <= 0} onClick={() => void goTo(items[stageIndex - 1].id)}>
-            ← Previous
-          </button>
-          <button type="button" className="btn btn-primary min-h-16 text-lg" disabled={!next} onClick={() => next && void goTo(next.id)}>
-            Next →
-          </button>
-        </div>
-
-        {onStage && (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
-            <span className="text-sm text-muted">Key of the song on stage</span>
-            <span className="flex items-center gap-2">
-              <button type="button" className="btn btn-icon h-10 w-10 text-lg" onClick={() => stepKey(-1)} aria-label="Down a half step">
-                −
-              </button>
-              <span className="w-12 text-center font-mono font-semibold">{deriveSong(onStage.song.original_key, onStage.settings).soundingKey || onStage.settings.semitones}</span>
-              <button type="button" className="btn btn-icon h-10 w-10 text-lg" onClick={() => stepKey(1)} aria-label="Up a half step">
-                +
-              </button>
-            </span>
-          </div>
+                {nextNotes.map(({ view, body }) => (
+                  <p key={view.id} className="mt-1 whitespace-pre-wrap text-muted">
+                    <span className="font-medium">{noteLabel(view)}:</span> {body}
+                  </p>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="mt-1 text-muted">Nothing in the setlist yet.</p>
         )}
+      </section>
 
-        <section aria-label="The setlist">
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
-            Setlist · {items.length} {items.length === 1 ? "song" : "songs"}. Tap one to send it to stage.
-          </p>
-          <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line">
-            {items.map((item, i) => (
+      <div className="grid grid-cols-2 gap-3">
+        <button type="button" className="btn min-h-16 text-lg" disabled={stageIndex <= 0} onClick={() => void goTo(items[stageIndex - 1].id)}>
+          ← Previous
+        </button>
+        <button type="button" className="btn btn-primary min-h-16 text-lg" disabled={!next} onClick={() => next && void goTo(next.id)}>
+          Next →
+        </button>
+      </div>
+
+      {onStage && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-line px-3 py-2">
+          <span className="text-sm text-muted">Key of the song on stage</span>
+          <span className="flex items-center gap-2">
+            <button type="button" className="btn btn-icon h-10 w-10 text-lg" onClick={() => stepKey(-1)} aria-label="Down a half step">
+              −
+            </button>
+            <span className="w-12 text-center font-mono font-semibold">{deriveSong(onStage.song.original_key, onStage.settings).soundingKey || onStage.settings.semitones}</span>
+            <button type="button" className="btn btn-icon h-10 w-10 text-lg" onClick={() => stepKey(1)} aria-label="Up a half step">
+              +
+            </button>
+          </span>
+        </div>
+      )}
+
+      <section aria-label="The setlist">
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted">
+          Setlist · {items.length} {items.length === 1 ? "song" : "songs"}. Tap one to send it to stage.
+        </p>
+        <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+          {items.map((item, i) => {
+            const hasNote = !!myViewId && ((everyone && noteFor(notes, item.id, everyone.id)?.body.trim()) || noteFor(notes, item.id, myViewId)?.body.trim());
+            return (
               <li key={item.id}>
                 <button
                   type="button"
@@ -216,42 +370,68 @@ export function Remote({
                 >
                   <span className="w-5 flex-none text-right text-sm text-muted tabular-nums">{i + 1}</span>
                   <span className="min-w-0 flex-1 truncate">{item.song.title}</span>
+                  {hasNote && (
+                    <span className="flex-none text-xs text-muted" title="Has a note for you">
+                      note
+                    </span>
+                  )}
                   {item.id === stageId && <span className="flex-none text-xs font-medium text-accent">On stage</span>}
                   <span className="flex-none font-mono text-xs text-muted">{deriveSong(item.song.original_key, item.settings).soundingKey}</span>
                 </button>
               </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      {myTasks.length > 0 && (
+        <details className="rounded-xl border border-line">
+          <summary className="cursor-pointer list-none px-3 py-3 text-sm font-medium">
+            Before the service{" "}
+            <span className="font-normal text-muted">
+              {progress.done}/{progress.total} ready
+            </span>
+          </summary>
+          <ul className="divide-y divide-line border-t border-line">
+            {myTasks.map((t) => (
+              <li key={t.id}>
+                <label className="flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2">
+                  <input type="checkbox" className="h-5 w-5 flex-none" checked={t.done} onChange={(e) => void tick(t, e.target.checked)} />
+                  <span className={`min-w-0 flex-1 ${t.done ? "text-muted line-through" : ""}`}>{t.label}</span>
+                </label>
+              </li>
             ))}
-          </ol>
-        </section>
+          </ul>
+        </details>
+      )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <button type="button" className="btn" onClick={() => setChecklistOpen(true)}>
-            Checklist{progress.total > 0 ? ` ${progress.done}/${progress.total}` : ""}
-          </button>
-          <button type="button" className="btn" onClick={() => setChatOpen((o) => !o)} aria-expanded={chatOpen}>
-            {chatOpen ? "Hide chat" : "Chat"}
-          </button>
+      <button type="button" className="btn" onClick={() => setChatOpen((o) => !o)} aria-expanded={chatOpen}>
+        {chatOpen ? "Hide chat" : "Chat"}
+      </button>
+      {chatOpen && (
+        <div className="h-72">
+          <SetlistChat
+            messages={messages}
+            role="stage"
+            screenId={screenId}
+            onSend={async (text) => {
+              epoch.current++;
+              const res = await remoteSendMessage(setlistId, text, screenId);
+              epoch.current++;
+              if (refused(res)) return "The remote was switched off.";
+              if ("message" in res && res.message) {
+                const sent = res.message;
+                setMessages((list) => (list.some((m) => m.id === sent.id) ? list : [...list, sent]));
+              }
+              return ("error" in res && res.error) || null;
+            }}
+          />
         </div>
+      )}
 
-        {chatOpen && (
-          <div className="h-72">
-            <SetlistChat
-              messages={messages}
-              role="media"
-              screenId={screenId}
-              onSend={async (text) => {
-                const res = await sendMessage(setlist.id, text, "media", screenId);
-                if (res.message) addMessages([res.message]);
-                return res.error ?? null;
-              }}
-            />
-          </div>
-        )}
-      </div>
-
-      <Modal open={checklistOpen} title="Before the service" onClose={() => setChecklistOpen(false)}>
-        <Checklist team={team} manage />
-      </Modal>
-    </div>
+      <button type="button" className="btn btn-quiet mt-auto self-center text-sm" onClick={() => void leave()}>
+        Leave the remote
+      </button>
+    </main>
   );
 }

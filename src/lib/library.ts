@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type { SongLite } from "./duplicates";
 import type { Play, SongRef } from "./history";
+import { VERSION_COLUMNS, type SongVersion } from "./song-versions";
 
 /** Supabase hands back at most this many rows per request, so bigger lists are read in pages. */
 const PAGE = 1000;
@@ -50,4 +51,15 @@ export async function getSongPlays(songId: string): Promise<{ count: number; las
   if (error) return { count: 0, last: null };
   const rows = (data as { played_on: string }[] | null) ?? [];
   return { count: rows.length, last: rows[0]?.played_on ?? null };
+}
+
+/** The earlier versions of a song, newest first. Empty when the song has none, or the update that keeps them hasn't been run. */
+export async function listSongVersions(songId: string): Promise<SongVersion[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("song_versions").select(VERSION_COLUMNS).eq("song_id", songId).order("saved_at", { ascending: false }).limit(60);
+  if (error) {
+    console.error("listSongVersions failed:", error.message);
+    return [];
+  }
+  return (data as SongVersion[] | null) ?? [];
 }
