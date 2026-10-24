@@ -110,8 +110,45 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
       { user_id: "00000000-0000-4000-8000-0000000000f3", email: "tom@example.com", first_name: "Tom", last_name: "Okafor", ministries: ["media"], role: "member", joined_at: new Date().toISOString() },
     ],
   };
+  // The schedule: people, events with who is on them, and the change log.
+  const nextSunday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + ((7 - d.getDay()) % 7));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+  const starter = [
+    ["song-leader", "Song leader", "Vocals", false], ["keys", "Keys", "Band", false], ["drums", "Drums", "Band", false],
+    ["bass", "Bass", "Band", false], ["electric-guitar", "Electric guitar", "Band", false], ["acoustic-guitar", "Acoustic guitar", "Band", false],
+    ["audio", "Audio", "Sound booth", false], ["projection", "Projection", "Sound booth", false], ["camera", "Camera", "Sound booth", false],
+  ].map(([key, label, section, optional], i) => ({ id: `c-${key}`, key, label, kind: "people", section, options: [], ministries: { "song-leader": ["stage:vocals"], keys: ["stage:keys"], drums: ["stage:drums"], bass: ["stage:bass"], "electric-guitar": ["stage:electric-guitar"], audio: ["media:audio"], projection: ["media:sound-booth"], camera: ["media:camera"] }[key] ?? [], optional, position: (i + 1) * 10, archived: false }));
+  starter.push({ id: "c-type-of-sunday", key: "type-of-sunday", label: "Type of Sunday", kind: "choice", section: "", options: ["Communion Sunday", "Canada Sunday", "Israel Sunday"], ministries: [], optional: false, position: 5, archived: false });
+  const PID = (n) => `00000000-0000-4000-8000-00000000a${n}`;
+  const sched = {
+    people: [
+      { id: PID(1), first_name: "Ana", last_name: "Lopez", ministries: ["stage:drums"], user_id: IDS.user },
+      { id: PID(2), first_name: "Maria", last_name: "Reyes", ministries: ["stage:keys", "stage:vocals"], user_id: "00000000-0000-4000-8000-0000000000f2" },
+      { id: PID(3), first_name: "Tom", last_name: "Okafor", ministries: ["stage:electric-guitar"], user_id: null },
+      { id: PID(4), first_name: "Eli", last_name: "Elder", ministries: ["stage:bass", "media"], user_id: null },
+    ],
+    events: [
+      {
+        id: "00000000-0000-4000-8000-0000000000e9", kind: "sunday", title: "Sunday service", starts_on: nextSunday, starts_at: "09:30:00", location: "Main hall", notes: "Communion Sunday", created_by: null, fields: { "type-of-sunday": "Communion Sunday" },
+        schedule_assignments: [
+          { id: "00000000-0000-4000-8000-0000000000aa1", person_id: PID(2), role: "song-leader", note: "" },
+          { id: "00000000-0000-4000-8000-0000000000aa2", person_id: PID(1), role: "drums", note: "" },
+          { id: "00000000-0000-4000-8000-0000000000aa3", person_id: PID(3), role: "electric-guitar", note: "" },
+        ],
+      },
+      { id: "00000000-0000-4000-8000-0000000000e8", kind: "event", title: "Youth night", starts_on: futureDate(4), starts_at: "18:30:00", location: "Hall", notes: "", created_by: IDS.user, fields: {}, schedule_assignments: [] },
+    ],
+    columns: starter,
+    log: [
+      { id: randomUUID(), actor_name: "Maria Reyes", action: "assigned", summary: "put Tom Okafor on electric guitar for Sunday, Oct 25", created_at: new Date(Date.now() - 36e5).toISOString(), event_id: null },
+      { id: randomUUID(), actor_name: "Ana Lopez", action: "event_added", summary: "added the event “Youth night” on Monday, Oct 26", created_at: new Date(Date.now() - 864e5).toISOString(), event_id: null },
+    ],
+  };
   // What the phone remote changes: kept so a later read shows it.
-  const setlistState = { remote_pin: null, remote_started_at: null, remote_expires_at: null, active_item_id: null, timer_ends_at: null };
+  const setlistState = { event_id: null, remote_pin: null, remote_started_at: null, remote_expires_at: null, active_item_id: null, timer_ends_at: null };
   const taskDone = new Map();
   const failures = new Map();
   const bodyAt = (n) => fullSong.body.split("\n").slice(0, 8 + n).join("\n");
@@ -239,6 +276,92 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
         join.linked = true;
         return send(200, { ok: true, church_id: IDS.church, name: parsed.p_name });
       }
+      // The schedule's functions.
+      if (table === "rpc/schedule_ensure_sunday") {
+        let ev = sched.events.find((e) => e.kind === "sunday" && e.starts_on === parsed.p_date);
+        if (!ev) {
+          ev = { id: randomUUID(), kind: "sunday", title: "Sunday service", starts_on: parsed.p_date, starts_at: null, location: "", notes: "", created_by: IDS.user, fields: {}, schedule_assignments: [] };
+          sched.events.push(ev);
+        }
+        return send(200, { ok: true, event_id: ev.id });
+      }
+      if (table === "rpc/schedule_assign") {
+        const ev = sched.events.find((e) => e.id === parsed.p_event);
+        if (!ev) return send(200, { error: "That event isn't there any more." });
+        const elsewhere = ev.schedule_assignments.find((a) => a.person_id === parsed.p_person && a.role !== parsed.p_role);
+        if (elsewhere) return send(200, { error: `That person is already on ${elsewhere.role} that day. Take them off first.` });
+        ev.schedule_assignments = ev.schedule_assignments.filter((a) => a.role !== parsed.p_role);
+        const made = { id: randomUUID(), person_id: parsed.p_person, role: parsed.p_role, note: "" };
+        ev.schedule_assignments.push(made);
+        const who = sched.people.find((p) => p.id === parsed.p_person);
+        sched.log.unshift({ id: randomUUID(), actor_name: "Ana Lopez", action: "assigned", summary: `put ${who?.first_name} ${who?.last_name} on ${parsed.p_role} for ${ev.title}`, created_at: new Date().toISOString(), event_id: ev.id });
+        return send(200, { ok: true, id: made.id });
+      }
+      if (table === "rpc/schedule_unassign") {
+        for (const ev of sched.events) ev.schedule_assignments = ev.schedule_assignments.filter((a) => a.id !== parsed.p_id);
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/schedule_add_event") {
+        const ev = { id: randomUUID(), kind: "event", title: parsed.p_title, starts_on: parsed.p_date, starts_at: parsed.p_time ? `${parsed.p_time}:00` : null, location: parsed.p_location ?? "", notes: parsed.p_notes ?? "", created_by: IDS.user, fields: {}, schedule_assignments: [] };
+        sched.events.push(ev);
+        sched.log.unshift({ id: randomUUID(), actor_name: "Ana Lopez", action: "event_added", summary: `added the event “${ev.title}”`, created_at: new Date().toISOString(), event_id: ev.id });
+        return send(200, { ok: true, event_id: ev.id });
+      }
+      if (table === "rpc/people_add") {
+        const made = { id: randomUUID(), first_name: parsed.p_first, last_name: parsed.p_last, ministries: parsed.p_ministries ?? [], user_id: null };
+        sched.people.push(made);
+        return send(200, { ok: true, person_id: made.id });
+      }
+      if (table === "rpc/setlist_link_event") {
+        const sun = parsed.p_event ? sched.events.find((e) => e.id === parsed.p_event) : sched.events.find((e) => e.kind === "sunday");
+        setlistState.event_id = sun?.id ?? null;
+        return send(200, { ok: true, event_id: setlistState.event_id });
+      }
+      if (table === "rpc/setlist_unlink_event") {
+        setlistState.event_id = null;
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/schedule_set_field") {
+        const ev = sched.events.find((e) => e.id === parsed.p_event);
+        if (!ev) return send(200, { error: "That event isn't there any more." });
+        ev.fields = { ...ev.fields };
+        if (parsed.p_value) ev.fields[parsed.p_key] = parsed.p_value;
+        else delete ev.fields[parsed.p_key];
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/schedule_column_add") {
+        const key = String(parsed.p_label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+        const made = { id: randomUUID(), key, label: parsed.p_label, kind: parsed.p_kind, section: parsed.p_section ?? "", options: parsed.p_options ?? [], ministries: parsed.p_ministries ?? [], optional: !!parsed.p_optional, position: 500 + sched.columns.length, archived: false };
+        sched.columns.push(made);
+        return send(200, { ok: true, key, id: made.id });
+      }
+      if (table === "rpc/schedule_column_update") {
+        const c = sched.columns.find((x) => x.id === parsed.p_id);
+        if (c) Object.assign(c, { label: parsed.p_label, section: parsed.p_section, options: parsed.p_options ?? [], ministries: parsed.p_ministries ?? [], optional: !!parsed.p_optional });
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/schedule_column_archive") {
+        const c = sched.columns.find((x) => x.id === parsed.p_id);
+        if (c) c.archived = !!parsed.p_archived;
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/schedule_column_move") return send(200, { ok: true });
+      if (table === "rpc/schedule_column_delete") {
+        sched.columns = sched.columns.filter((c) => c.id !== parsed.p_id);
+        return send(200, { ok: true });
+      }
+      if (table === "rpc/schedule_columns_apply") {
+        const created = [];
+        for (const n of parsed.p_new ?? []) {
+          const key = String(n.label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+          if (!sched.columns.some((c) => c.key === key)) sched.columns.push({ id: randomUUID(), key, label: n.label, kind: n.kind, section: n.section ?? "", options: n.options ?? [], ministries: [], optional: false, position: 500 + sched.columns.length, archived: false });
+          created.push({ ref: n.ref, key });
+        }
+        let hidden = 0;
+        if (parsed.p_keep) for (const c of sched.columns) if (!c.archived && !parsed.p_keep.includes(c.key) && !created.some((x) => x.key === c.key) && !sched.events.some((e) => e.schedule_assignments.some((a) => a.role === c.key))) { c.archived = true; hidden++; }
+        return send(200, { ok: true, created, hidden });
+      }
+      if (table === "rpc/schedule_import") return send(200, { ok: true, events: parsed.p_rows?.length ?? 0, assignments: 3, created_people: 0, unknown: [], skipped_rows: 0 });
       if (table === "rpc/church_requests") return send(200, join.requests);
       if (table === "rpc/church_members") return send(200, join.members);
       if (table === "rpc/decide_application") {
@@ -297,10 +420,22 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
 
     if (table === "church_accounts") {
       if (!join.linked) return send(200, object ? null : []);
-      const own = select.includes("first_name") ? { first_name: "Ana", last_name: "Lopez", ministries: ["stage:drums"], role: "church" } : { role: "church", church };
+      const profile = { first_name: "Ana", last_name: "Lopez", ministries: ["stage:drums"], role: "church" };
+      const own = select.includes("church:") ? { role: "church", first_name: profile.first_name, last_name: profile.last_name, church } : select.includes("first_name") ? profile : { role: "church", church };
       return send(200, object ? own : [own]);
     }
     if (table === "church_applications") return send(200, [], { "content-range": `*/${join.requests.length}` });
+    if (table === "people") {
+      const uid = (url.searchParams.get("user_id") ?? "").replace("eq.", "");
+      const rows = uid ? sched.people.filter((p) => p.user_id === uid) : sched.people;
+      return send(200, rows);
+    }
+    if (table === "schedule_events") {
+      const wanted = (url.searchParams.get("id") ?? "").replace("eq.", "");
+      return send(200, wanted ? sched.events.filter((e) => e.id === wanted) : sched.events);
+    }
+    if (table === "schedule_log") return send(200, sched.log);
+    if (table === "schedule_columns") return send(200, sched.columns);
     if (table === "rpc/song_facets") return send(200, facets);
     if (table === "chord_shortcuts") return send(200, [{ id: randomUUID(), chord: "G" }, { id: randomUUID(), chord: "D" }]);
     if (table === "setlist_messages") return send(200, messages);
@@ -337,6 +472,8 @@ export function startStub({ port, latencyMs, songs = 1397 }) {
         const row = { ...setlistRow(0), ...setlistState, church_id: IDS.church };
         return send(200, object ? row : [row]);
       }
+      // The schedule asks for the setlists that are linked to an event.
+      if (url.searchParams.has("event_id")) return send(200, setlistState.event_id ? [{ id: IDS.setlist, name: "Sunday set", service_date: null, event_id: setlistState.event_id }] : []);
       return send(200, setlists);
     }
     if (table === "setlist_items") {

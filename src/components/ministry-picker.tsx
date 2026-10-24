@@ -4,7 +4,7 @@ import { MINISTRY_GROUPS, toggleMinistry } from "@/lib/ministries";
 
 /**
  * Choosing the ministries a person serves in: Stage (with the instrument, as many as they play or sing) and Media
- * (no specific roles). Several can be chosen, and they can be changed any time.
+ * (Audio, Sound booth or Camera). Several can be chosen, and they can be changed any time.
  */
 export function MinistryPicker({ value, onChange, disabled = false }: { value: string[]; onChange: (value: string[]) => void; disabled?: boolean }) {
   return (

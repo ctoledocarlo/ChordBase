@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import type { Person, ScheduleEvent } from "@/lib/schedule";
+import type { ScheduleColumn } from "@/lib/schedule-columns";
+import type { EventChoice } from "@/lib/schedule-data";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useRef, useState } from "react";
 import {
@@ -34,6 +37,7 @@ import { keepForOffline } from "./offline-support";
 import { ServiceClock } from "./service-clock";
 import { SongLinkList } from "./song-extras";
 import { RemotePanel } from "./remote-panel";
+import { SetlistRoster, rosterHint } from "./setlist-roster";
 import { Checklist } from "./team-checklist";
 import { NotesCard, NotesEditor, ViewManager } from "./team-notes";
 import { useTeam } from "./use-team";
@@ -92,6 +96,11 @@ export function SetlistPlayer({
   initialExtras,
   initialSingers,
   shortcuts,
+  team: serviceTeam,
+  people,
+  columns,
+  eventChoices,
+  myPersonId,
 }: {
   setlist: Setlist;
   initialItems: SetlistItem[];
@@ -99,6 +108,13 @@ export function SetlistPlayer({
   initialExtras: TeamExtras;
   initialSingers: Singer[];
   shortcuts: ChordShortcut[];
+  /** The schedule's event for this setlist's service, with who is on it, or null when none is linked yet. */
+  team: ScheduleEvent | null;
+  people: Person[];
+  columns: ScheduleColumn[];
+  /** The services and events on the schedule around now, for linking this setlist to one. */
+  eventChoices: EventChoice[];
+  myPersonId: string | null;
 }) {
   const [items, setItems] = useState(initialItems);
   const [currentId, setCurrentId] = useState<string | null>(
@@ -815,6 +831,9 @@ export function SetlistPlayer({
           </>
         )}
 
+        <Fold title="Schedule and team" tour="setlist-roster" hint={rosterHint(serviceTeam, people)}>
+          <SetlistRoster setlist={{ id: setlist.id, name: setlist.name, service_date: setlist.service_date }} team={serviceTeam} people={people} columns={columns} choices={eventChoices} myPersonId={myPersonId} />
+        </Fold>
         <Fold title="Instrument views" tour="setlist-views" hint={team.views.length > 1 ? `${team.views.length - 1} added` : undefined}>
           <ViewManager team={team} />
         </Fold>

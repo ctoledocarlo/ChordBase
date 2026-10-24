@@ -1,6 +1,7 @@
 /**
- * The ministries a person can serve in. Stage has an instrument (a person can pick several); Media has no
- * specific roles. They are stored as short tokens ("stage:drums", "media") and the database refuses any other.
+ * The ministries a person can serve in. Stage has an instrument and Media has a role (Audio, Sound booth or Camera); a
+ * person can pick several of either. They are stored as short tokens ("stage:drums", "media:camera") and the database
+ * refuses any other. The older "media" (no specific roles) still reads, as all three media roles.
  */
 
 export type MinistryGroup = { id: "stage" | "media"; label: string; options: { token: string; label: string }[] };
@@ -19,17 +20,30 @@ export const MINISTRY_GROUPS: MinistryGroup[] = [
       { token: "stage:other", label: "Other instrument" },
     ],
   },
-  { id: "media", label: "Media", options: [{ token: "media", label: "Media (no specific roles)" }] },
+  {
+    id: "media",
+    label: "Media",
+    options: [
+      { token: "media:audio", label: "Audio" },
+      { token: "media:sound-booth", label: "Sound booth" },
+      { token: "media:camera", label: "Camera" },
+    ],
+  },
 ];
 
 export const ALL_MINISTRIES: string[] = MINISTRY_GROUPS.flatMap((g) => g.options.map((o) => o.token));
 
-export const isMinistry = (token: unknown): token is string => typeof token === "string" && ALL_MINISTRIES.includes(token);
+/** The old "Media" with no specific roles. */
+export const LEGACY_MEDIA = "media";
+const MEDIA_TOKENS = MINISTRY_GROUPS.find((g) => g.id === "media")!.options.map((o) => o.token);
+
+export const isMinistry = (token: unknown): token is string => typeof token === "string" && (ALL_MINISTRIES.includes(token) || token === LEGACY_MEDIA);
 
 /** Only the known ministries, each once, in the order the picker lists them. */
 export function cleanMinistries(tokens: unknown): string[] {
   if (!Array.isArray(tokens)) return [];
   const given = new Set(tokens.filter(isMinistry));
+  if (given.has(LEGACY_MEDIA)) for (const t of MEDIA_TOKENS) given.add(t);
   return ALL_MINISTRIES.filter((t) => given.has(t));
 }
 
@@ -44,9 +58,10 @@ const labelOf = (token: string) => MINISTRY_GROUPS.flatMap((g) => g.options).fin
 export function describeMinistries(tokens: string[]): string {
   const chosen = cleanMinistries(tokens);
   const stage = chosen.filter((t) => t.startsWith("stage:")).map(labelOf);
+  const media = chosen.filter((t) => t.startsWith("media:")).map(labelOf);
   const parts: string[] = [];
   if (stage.length > 0) parts.push(`Stage: ${stage.join(", ")}`);
-  if (chosen.includes("media")) parts.push("Media");
+  if (media.length > 0) parts.push(`Media: ${media.join(", ")}`);
   return parts.join(" · ");
 }
 

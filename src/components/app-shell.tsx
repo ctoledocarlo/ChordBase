@@ -75,7 +75,7 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
     </a>
     <div className="flex flex-1 flex-col">
       <header data-app-chrome className="sticky top-0 z-20 border-b border-line bg-background">
-        <div className="flex h-14 items-stretch gap-3 px-3 sm:gap-6 sm:px-4 lg:px-6">
+        <div className="flex h-14 items-stretch gap-2 px-2.5 sm:gap-6 sm:px-4 lg:px-6">
           <Link href="/" aria-label="ChordBase, home" className="flex items-center text-base font-semibold tracking-tight">
             <Logo size={26} iconOnlyOnPhone />
           </Link>
@@ -87,7 +87,8 @@ export function AppShell({ account, children }: { account: ReactNode; children: 
               <HelpMenu />
             </Suspense>
             <div data-tour="account">{account}</div>
-            <span data-tour="theme" className="flex">
+            {/* On a phone the light/dark switch is in the Account menu, to leave room for the tabs. */}
+            <span data-tour="theme" className="hidden sm:flex">
               <ThemeToggle />
             </span>
           </div>
@@ -179,11 +180,12 @@ function MainNav() {
   const pathname = usePathname();
   const items = [
     { href: "/setlists", label: "Setlists", soon: false, active: pathname.startsWith("/setlists") },
+    { href: "/schedule", label: "Schedule", soon: false, active: pathname.startsWith("/schedule") },
     { href: "/", label: "Songs", soon: false, active: pathname === "/" || pathname.startsWith("/songs") },
     { href: "/practice", label: "Practice", soon: false, active: pathname.startsWith("/practice") },
   ];
   return (
-    <nav aria-label="Main" data-tour="nav" className="flex items-stretch gap-4 text-sm sm:gap-5">
+    <nav aria-label="Main" data-tour="nav" className="flex items-stretch gap-2.5 text-[0.8125rem] sm:gap-5 sm:text-sm">
       {items.map((it) => (
         <Link
           key={it.href}

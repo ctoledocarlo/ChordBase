@@ -14,6 +14,11 @@ const ICONS: Record<string, string> = {
   person_changed: "✎",
   person_removed: "✕",
   imported: "⇪",
+  setlist_linked: "♪",
+  setlist_unlinked: "♪",
+  column_added: "＋",
+  column_changed: "✎",
+  field_changed: "✎",
 };
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

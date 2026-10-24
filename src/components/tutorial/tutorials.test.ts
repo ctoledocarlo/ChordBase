@@ -35,10 +35,11 @@ describe("tutorials", () => {
 
   it("covers the three kinds, with a tour, a page tutorial for every page, and guides", () => {
     expect(TUTORIALS.filter((t) => t.kind === "site")).toHaveLength(1);
-    for (const page of ["songs", "song", "setlists", "setlist", "editor", "import", "practice"] as const) {
+    for (const page of ["songs", "song", "setlists", "setlist", "editor", "import", "practice", "schedule", "team"] as const) {
       expect(pageTutorialFor(page), page).toBeDefined();
     }
     expect(functionTutorialsFor("setlist").length).toBeGreaterThan(1);
+    expect(functionTutorialsFor("schedule").map((t) => t.id)).toEqual(["fn-link", "fn-columns"]);
   });
 
   it("knows which page an address is", () => {
@@ -50,6 +51,8 @@ describe("tutorials", () => {
     expect(pageKeyFor("/setlists")).toBe("setlists");
     expect(pageKeyFor("/setlists/abc")).toBe("setlist");
     expect(pageKeyFor("/practice")).toBe("practice");
+    expect(pageKeyFor("/schedule")).toBe("schedule");
+    expect(pageKeyFor("/members")).toBe("team");
     expect(pageKeyFor("/practice/triads")).toBe("practice");
     expect(pageKeyFor("/login")).toBeNull();
   });

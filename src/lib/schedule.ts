@@ -1,5 +1,4 @@
 import { fullName } from "./ministries";
-import type { ScheduleRole } from "./schedule-roles";
 
 /**
  * The schedule's data and the date work around it. Dates are plain "2026-10-25" text, with no time zone, so a Sunday
@@ -8,7 +7,8 @@ import type { ScheduleRole } from "./schedule-roles";
 
 export type Person = { id: string; first_name: string; last_name: string; ministries: string[]; user_id: string | null };
 
-export type Assignment = { id: string; person_id: string; role: ScheduleRole; note: string };
+/** `role` is the key of the people column the person is on ("drums"). */
+export type Assignment = { id: string; person_id: string; role: string; note: string };
 
 export type ScheduleEvent = {
   id: string;
@@ -19,6 +19,8 @@ export type ScheduleEvent = {
   location: string;
   notes: string;
   created_by: string | null;
+  /** The values of the choice and text columns, by column key. */
+  fields: Record<string, string>;
   assignments: Assignment[];
 };
 
@@ -35,10 +37,17 @@ export type Slot = {
   location: string;
   notes: string;
   created_by: string | null;
+  fields: Record<string, string>;
   assignments: Assignment[];
 };
 
 export const personName = (p: Pick<Person, "first_name" | "last_name">): string => fullName(p.first_name, p.last_name);
+
+/** "Maria R." for a table cell: the first name and the first letter of the last. */
+export const shortPersonName = (p: Pick<Person, "first_name" | "last_name">): string => {
+  const last = p.last_name.trim();
+  return last ? `${p.first_name.trim()} ${last[0].toUpperCase()}.` : p.first_name.trim();
+};
 
 /** "09:30:00" as "09:30". */
 export const shortTime = (t: string | null | undefined): string | null => (t ? t.slice(0, 5) : null);
@@ -132,7 +141,7 @@ export function buildSlots(events: ScheduleEvent[], from: string, to: string): S
     slots.push(
       saved
         ? toSlot(saved)
-        : { id: null, kind: "sunday", title: "Sunday service", date, time: null, location: "", notes: "", created_by: null, assignments: [] },
+        : { id: null, kind: "sunday", title: "Sunday service", date, time: null, location: "", notes: "", created_by: null, fields: {}, assignments: [] },
     );
   }
   for (const e of inRange) if (e.kind === "event") slots.push(toSlot(e));
@@ -149,12 +158,13 @@ const toSlot = (e: ScheduleEvent): Slot => ({
   location: e.location,
   notes: e.notes,
   created_by: e.created_by,
+  fields: e.fields ?? {},
   assignments: e.assignments,
 });
 
 /** The people on a slot, by role, in the order the roles are listed. */
-export function byRole(assignments: Assignment[], people: Map<string, Person>): Map<ScheduleRole, { assignment: Assignment; person: Person }[]> {
-  const out = new Map<ScheduleRole, { assignment: Assignment; person: Person }[]>();
+export function byRole(assignments: Assignment[], people: Map<string, Person>): Map<string, { assignment: Assignment; person: Person }[]> {
+  const out = new Map<string, { assignment: Assignment; person: Person }[]>();
   for (const a of assignments) {
     const person = people.get(a.person_id);
     if (!person) continue;

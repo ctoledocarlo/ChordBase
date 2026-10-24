@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addDays, buildSlots, byRole, dayText, hueFor, initials, isIsoDate, isSunday, onSlot, relativeDay, sundaysFrom, thisOrNextSunday, timeText, weekday, type Person, type ScheduleEvent } from "./schedule";
 
 const person = (id: string, first: string, last: string): Person => ({ id, first_name: first, last_name: last, ministries: [], user_id: null });
-const event = (over: Partial<ScheduleEvent>): ScheduleEvent => ({ id: "e", kind: "event", title: "Event", starts_on: "2026-10-27", starts_at: null, location: "", notes: "", created_by: null, assignments: [], ...over });
+const event = (over: Partial<ScheduleEvent>): ScheduleEvent => ({ id: "e", kind: "event", title: "Event", starts_on: "2026-10-27", starts_at: null, location: "", notes: "", created_by: null, fields: {}, assignments: [], ...over });
 
 describe("dates", () => {
   it("know which day is Sunday", () => {

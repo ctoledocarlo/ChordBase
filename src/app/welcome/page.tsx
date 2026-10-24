@@ -7,7 +7,7 @@ import { Logo } from "@/components/logo";
 export const metadata: Metadata = {
   title: "ChordBase · Lyrics and chords for your church",
   description:
-    "Lyrics and chords for your church, in any key. Search by lyrics, plan setlists, and run the service live across Stage, Media and Viewer screens.",
+    "Lyrics and chords for your church, in any key. Search by lyrics, plan setlists, schedule your team, and run the service live across Stage, Media and Viewer screens and phones.",
 };
 
 const FEATURES = [
@@ -17,6 +17,9 @@ const FEATURES = [
   { chord: "Cmaj7", title: "Chords in the key", text: "Every chord that belongs to the key sits beside the song, with the ones the song uses marked." },
   { chord: "Em7", title: "Live key changes", text: "Singer needs it a step higher? Change the key from the live screen and everyone follows." },
   { chord: "F", title: "Tidy by itself", text: "Setlists keep for a month by default, up to a year, then clear themselves. Your songs always stay." },
+  { chord: "Dm", title: "Every version kept", text: "Each save that changes a song keeps how it was. Compare an older version with today's and put it back if you want." },
+  { chord: "Bb", title: "Excel in and out", text: "Export the schedule as a spreadsheet, or bring in your church's own sheet. It only ever adds, never removes." },
+  { chord: "E7", title: "Sign in your way", text: "Use an email and password or your Google account. A church registers once and the team applies to join it." },
 ] as const;
 
 /** A card or panel in the dark style used across this page. */
@@ -81,7 +84,7 @@ export default function WelcomePage() {
             </h1>
             <p className="anim-rise mt-6 max-w-xl text-lg leading-relaxed text-zinc-400" style={{ animationDelay: "90ms" }}>
               Keep every song your church plays in one place. Find it by a line you remember, change the key for your
-              singer, plan Sunday&apos;s setlist, and run the whole service live across every screen.
+              singer, plan Sunday&apos;s setlist, schedule your team, and run the whole service live across every screen and phone.
             </p>
             <div className="anim-rise mt-8 flex flex-wrap items-center gap-3" style={{ animationDelay: "180ms" }}>
               <Link
@@ -171,6 +174,7 @@ export default function WelcomePage() {
               <p>Put songs in order, drag to rearrange, and give each song its own key, capo, text size and chord style, just for that setlist.</p>
               <p>Need a chord changed for Sunday only? Edit it right in the setlist. The song in your library stays as it was.</p>
               <p>Between songs, a bridge shows the chords to get from the end of one into the start of the next, suggested for you or written by hand.</p>
+              <p>Link the setlist to its Sunday, from the setlist or from the schedule, and the team for that service shows beside it and prints on it.</p>
             </>
           }
         >
@@ -205,8 +209,64 @@ export default function WelcomePage() {
           </Panel>
         </Section>
 
+        {/* Schedule */}
+        <Section
+          eyebrow="Schedule the team"
+          title="Everyone knows when they're on."
+          text={
+            <>
+              <p>Every Sunday is already on the schedule. Put the song leader, the band and the sound booth on each one (one person to a role, and no one in two places), add an event in between, and let people put themselves on, too. A change log keeps track of who changed what.</p>
+              <p>The columns are your church&apos;s own. Start with vocals, band and sound booth, then add dancers, a team for each service, or the type of Sunday. Bring in your church&apos;s spreadsheet, or take the schedule out as one.</p>
+              <p>A roster lists the band and the sound booth with every role each person can do, so you can see who covers what. A summary beside the schedule shows what a scheduler needs: the roles still empty, who has been off the longest, how often each person has served and on which kind of Sunday.</p>
+            </>
+          }
+        >
+          <Panel className="p-5">
+            <div aria-hidden className="space-y-4">
+              <div className="rounded-lg border border-white/10 p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex w-10 flex-none flex-col items-center rounded-md border border-white/10 py-1 leading-tight">
+                    <span className="text-[0.5625rem] uppercase text-zinc-500">Oct</span>
+                    <span className="text-base font-semibold">25</span>
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">Sunday service</span>
+                    <span className="mt-0.5 inline-flex rounded-full border border-blue-400/40 bg-blue-400/10 px-2 py-0.5 text-blue-300">♪ Sunday set</span>
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-x-3 gap-y-2 border-t border-white/10 pt-3">
+                  {[
+                    ["Song leader", "Maria R."],
+                    ["Drums", "Ana L."],
+                    ["Keys", ""],
+                    ["Audio", "Eli E."],
+                    ["Bass", "Tom O."],
+                    ["Camera", ""],
+                  ].map(([role, name]) => (
+                    <div key={role}>
+                      <p className="text-[0.625rem] uppercase tracking-wide text-zinc-500">{role}</p>
+                      {name ? <span className="mt-0.5 inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-zinc-200">{name}</span> : <span className="mt-0.5 inline-flex rounded-full border border-dashed border-white/15 px-2 py-0.5 text-zinc-500">+ Add</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Chip>Communion Sunday</Chip>
+                <span className="text-xs text-zinc-500">the type of Sunday, picked from your own list</span>
+              </div>
+              <div className="rounded-lg border border-white/10 p-3 text-xs">
+                <p className="font-medium uppercase tracking-wide text-zinc-500">Scheduler&apos;s summary</p>
+                <p className="mt-2 text-zinc-300">Nov 1 · 1 open: Audio</p>
+                <p className="mt-1 text-zinc-300">Eli E. · last served 6 weeks ago</p>
+                <p className="mt-1 text-zinc-400">Ana L. · 4× this quarter · Canada Sunday 2, Communion 1</p>
+              </div>
+            </div>
+          </Panel>
+        </Section>
+
         {/* Screens */}
         <Section
+          flip
           eyebrow="Run it live"
           title="The right screen for everyone."
           text={
@@ -250,9 +310,90 @@ export default function WelcomePage() {
           </div>
         </Section>
 
-        {/* Chord styles */}
+        {/* Phone remote */}
+        <Section
+          eyebrow="In everyone's pocket"
+          title="Join from a phone. No login."
+          text={
+            <>
+              <p>Start the phone remote on a setlist and it shows a PIN and a QR code. Musicians scan it or type the PIN, pick their instrument, and follow along. There is no limit to how many phones can join.</p>
+              <p>Each instrument reads its own notes and can write its own notes for the next time. Moving to another song asks first, so nothing changes by accident.</p>
+              <p>The remote switches itself off after four hours, with the option to add an hour near the end.</p>
+            </>
+          }
+        >
+          <Panel className="mx-auto max-w-xs p-5">
+            <div aria-hidden className="space-y-3">
+              <p className="text-center text-xs font-medium uppercase tracking-wide text-zinc-500">Enter the PIN</p>
+              <div className="flex justify-center gap-2">
+                {["4", "8", "2", "9"].map((d, i) => (
+                  <span key={i} className="flex h-11 w-9 items-center justify-center rounded-md border border-white/15 bg-black/20 font-mono text-lg font-bold text-blue-300">
+                    {d}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                <Chip>Drums</Chip>
+                <Chip on>Keys</Chip>
+                <Chip>Bass</Chip>
+                <Chip>Vocals</Chip>
+              </div>
+              <div className="rounded-lg border border-white/10 p-3">
+                <p className="text-[0.6875rem] font-medium uppercase tracking-wide text-zinc-500">On stage</p>
+                <p className="mt-1 flex items-center gap-2 text-sm font-medium">
+                  <span className="font-mono text-blue-400">G</span> Next song up
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  <Bar w={85} strong />
+                  <Bar w={60} />
+                </div>
+              </div>
+            </div>
+          </Panel>
+        </Section>
+
+        {/* Team */}
         <Section
           flip
+          eyebrow="Your church, your team"
+          title="Register once. Everyone applies."
+          text={
+            <>
+              <p>A church registers once and has up to two main accounts. Band and media team members make their own account, say their name and ministry, and apply to join it.</p>
+              <p>Main accounts approve people and can make admins. Admins run the schedule and the people list. Someone already on your schedule without an account is linked to theirs when you approve them, so none of their history is lost.</p>
+            </>
+          }
+        >
+          <Panel className="p-5">
+            <div aria-hidden className="space-y-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Requests to join</p>
+              <div className="flex items-center gap-3 rounded-lg border border-white/10 p-3">
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">Eli Elder</span>
+                  <span className="block text-xs text-zinc-500">Stage: Bass · Media</span>
+                </span>
+                <Chip on>Approve</Chip>
+                <Chip>Decline</Chip>
+              </div>
+              <p className="pt-1 text-xs font-medium uppercase tracking-wide text-zinc-500">The church</p>
+              <ul className="divide-y divide-white/10 rounded-lg border border-white/10 text-sm">
+                {[
+                  ["Friends of Faith · Main", "Church"],
+                  ["Tom Okafor", "Admin"],
+                  ["Maria Reyes", "Member"],
+                ].map(([name, role]) => (
+                  <li key={name} className="flex items-center justify-between px-3 py-2.5">
+                    <span>{name}</span>
+                    <span className="rounded-full border border-white/10 px-2 py-0.5 text-xs text-zinc-400">{role}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Panel>
+        </Section>
+
+        {/* Chord styles */}
+        <Section
           eyebrow="Make it yours"
           title="Same song, played your way."
           text={

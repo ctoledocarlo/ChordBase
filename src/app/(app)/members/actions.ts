@@ -66,10 +66,10 @@ export async function cancelApplication(): Promise<Result> {
 }
 
 /** The church account answers an application. */
-export async function decideApplication(id: string, approve: boolean): Promise<Result> {
+export async function decideApplication(id: string, approve: boolean, personId: string | null = null): Promise<Result> {
   if (!(await isSignedIn())) return { error: NOT_SIGNED_IN };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("decide_application", { p_id: id, p_approve: !!approve });
+  const { data, error } = await supabase.rpc("decide_application", { p_id: id, p_approve: !!approve, p_person: approve && personId ? personId : null });
   const res = answer(data, error);
   if ("ok" in res) revalidatePath("/", "layout");
   return res;

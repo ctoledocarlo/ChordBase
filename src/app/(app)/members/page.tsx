@@ -4,6 +4,7 @@ import { MembersView } from "@/components/members-view";
 import { ListPageSkeleton } from "@/components/skeletons";
 import { getCurrentChurch } from "@/lib/church";
 import { listMembers, listRequests } from "@/lib/members";
+import { listUnlinkedPeople } from "@/lib/schedule-data";
 import { can } from "@/lib/roles";
 
 export default function MembersPage() {
@@ -15,8 +16,8 @@ export default function MembersPage() {
 }
 
 async function Members() {
-  const [church, members, requests] = await Promise.all([getCurrentChurch(), listMembers(), listRequests()]);
+  const [church, members, requests, unlinked] = await Promise.all([getCurrentChurch(), listMembers(), listRequests(), listUnlinkedPeople()]);
   // Only the church's own account runs its people (the database refuses anyone else too).
   if (!church || !can(church.role, "manage-members")) redirect("/");
-  return <MembersView members={members} requests={requests} actor={church.role} />;
+  return <MembersView members={members} requests={requests} actor={church.role} unlinked={unlinked} />;
 }

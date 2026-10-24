@@ -35,13 +35,19 @@ export function AddToSetlist({
   const [date, setDate] = useState("");
   const [keep, setKeep] = useState(String(DEFAULT_KEEP_MONTHS));
 
-  async function addTo(choice: SetlistChoice) {
-    setBusy(true);
+  // Shown as added at once; if the server says no, it is taken back with the reason.
+  function addTo(choice: SetlistChoice) {
     setError(null);
-    const res = await addSongToSetlist(choice.id, songId);
-    setBusy(false);
-    if (res.error) setError(res.error);
-    else setAdded((a) => ({ ...a, [choice.id]: choice.name }));
+    setAdded((a) => ({ ...a, [choice.id]: choice.name }));
+    void addSongToSetlist(choice.id, songId).then((res) => {
+      if (!res.error) return;
+      setAdded((a) => {
+        const rest = { ...a };
+        delete rest[choice.id];
+        return rest;
+      });
+      setError(res.error);
+    });
   }
 
   async function createAndAdd() {

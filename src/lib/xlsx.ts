@@ -216,8 +216,11 @@ function dateStyles(stylesXml: string | undefined): { date: Set<number>; time: S
   return { date, time };
 }
 
-/** Reads the first sheet (or the one called `prefer`) of an .xlsx file as rows of text. Dates and times come back as "2026-10-25" and "09:30". */
-export function readXlsx(bytes: Uint8Array, prefer = "Schedule"): { name: string; rows: string[][] } {
+/**
+ * Reads every sheet of an .xlsx file as rows of text, in workbook order. Dates and times come back as "2026-10-25" and
+ * "09:30". Sheets that can't be read are left out.
+ */
+export function readXlsxSheets(bytes: Uint8Array): { name: string; rows: string[][] }[] {
   if (bytes.length > MAX_XLSX_BYTES) throw new Error("That file is too big (up to 3 MB).");
   let unpacked: Record<string, Uint8Array>;
   try {
@@ -244,15 +247,26 @@ export function readXlsx(bytes: Uint8Array, prefer = "Schedule"): { name: string
     if (id && target) rels.set(id, target.replace(/^\/?(xl\/)?/, "xl/"));
   }
   const sheets = [...workbook.matchAll(/<sheet\b[^>]*>/g)].map((m) => ({ name: unescapeXml(attr(m[0], "name") ?? ""), rid: attr(m[0], "r:id") ?? "" }));
-  const picked = sheets.find((s) => s.name.toLowerCase() === prefer.toLowerCase()) ?? sheets[0];
-  const path = (picked && rels.get(picked.rid)) || "xl/worksheets/sheet1.xml";
-  const sheet = text(path);
-  if (!sheet) throw new Error("That file has no sheet to read.");
-
   const shared: string[] = [];
   for (const m of (text("xl/sharedStrings.xml") ?? "").matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)) shared.push(textOf(m[1] ?? ""));
   const styles = dateStyles(text("xl/styles.xml"));
 
+  const out: { name: string; rows: string[][] }[] = [];
+  for (const [i, picked] of sheets.entries()) {
+    const sheet = text(rels.get(picked.rid) ?? `xl/worksheets/sheet${i + 1}.xml`);
+    if (sheet) out.push({ name: picked.name, rows: readRows(sheet, shared, styles) });
+  }
+  if (out.length === 0) throw new Error("That file has no sheet to read.");
+  return out;
+}
+
+/** Reads the first sheet (or the one called `prefer`) of an .xlsx file. */
+export function readXlsx(bytes: Uint8Array, prefer = "Schedule"): { name: string; rows: string[][] } {
+  const all = readXlsxSheets(bytes);
+  return all.find((s) => s.name.toLowerCase() === prefer.toLowerCase()) ?? all[0];
+}
+
+function readRows(sheet: string, shared: string[], styles: { date: Set<number>; time: Set<number> }): string[][] {
   const rows: string[][] = [];
   for (const rowMatch of sheet.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
     const rowIndex = Number(attr(rowMatch[1], "r") ?? rows.length + 1) - 1;
@@ -286,5 +300,5 @@ export function readXlsx(bytes: Uint8Array, prefer = "Schedule"): { name: string
     while (rows.length < rowIndex) rows.push([]);
     rows[rowIndex] = cells;
   }
-  return { name: picked?.name ?? "Sheet1", rows };
+  return rows;
 }

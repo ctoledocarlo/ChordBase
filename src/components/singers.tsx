@@ -35,7 +35,6 @@ export function SingersModal({
   const [name, setName] = useState("");
   const [low, setLow] = useState("A2");
   const [high, setHigh] = useState("E4");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function start(singer?: Singer) {
@@ -46,23 +45,35 @@ export function SingersModal({
     setError(null);
   }
 
-  async function save() {
-    setBusy(true);
+  const byName = (a: Singer, b: Singer) => a.name.localeCompare(b.name);
+
+  // The list changes at once; the server is asked in the background, and if it says no the list goes back with the reason.
+  function save() {
     setError(null);
-    const res = await saveSinger(editing === "new" ? null : editing, name, low, high);
-    setBusy(false);
-    if ("error" in res) return setError(res.error);
-    onChange(editing === "new" ? [...singers, res.singer].sort((a, b) => a.name.localeCompare(b.name)) : singers.map((s) => (s.id === res.singer.id ? res.singer : s)));
+    const before = singers;
+    const target = editing;
+    const temp: Singer = { id: target === "new" || target === null ? `tmp-${Date.now()}` : target, name: name.trim(), range_low: low, range_high: high };
+    onChange(target === "new" ? [...singers, temp].sort(byName) : singers.map((s) => (s.id === temp.id ? temp : s)).sort(byName));
     setEditing(null);
+    void saveSinger(target === "new" ? null : target, name, low, high).then((res) => {
+      if ("error" in res) {
+        onChange(before);
+        setEditing(target);
+        return setError(res.error);
+      }
+      onChange(target === "new" ? [...before, res.singer].sort(byName) : before.map((s) => (s.id === res.singer.id ? res.singer : s)).sort(byName));
+    });
   }
 
-  async function remove(singer: Singer) {
-    setBusy(true);
-    const res = await deleteSinger(singer.id);
-    setBusy(false);
-    if (res.error) return setError(res.error);
+  function remove(singer: Singer) {
+    const before = singers;
     onChange(singers.filter((s) => s.id !== singer.id));
     if (editing === singer.id) setEditing(null);
+    void deleteSinger(singer.id).then((res) => {
+      if (!res.error) return;
+      onChange(before);
+      setError(res.error);
+    });
   }
 
   return (
@@ -80,10 +91,10 @@ export function SingersModal({
                   <span className="block truncate font-medium">{s.name}</span>
                   <span className="block text-xs text-muted">{rangeText(s)}</span>
                 </span>
-                <button type="button" className="btn" onClick={() => start(s)} disabled={busy}>
+                <button type="button" className="btn" onClick={() => start(s)}>
                   Edit
                 </button>
-                <button type="button" className="btn btn-quiet hover:!text-[#dc2626]" onClick={() => void remove(s)} disabled={busy} aria-label={`Remove ${s.name}`}>
+                <button type="button" className="btn btn-quiet hover:!text-[#dc2626]" onClick={() => remove(s)} aria-label={`Remove ${s.name}`}>
                   Remove
                 </button>
               </li>
@@ -153,8 +164,8 @@ export function SingersModal({
               <button type="button" className="btn" onClick={() => setEditing(null)}>
                 Cancel
               </button>
-              <button type="submit" className="btn btn-primary" disabled={busy || !name.trim()}>
-                {busy ? "Saving…" : "Save singer"}
+              <button type="submit" className="btn btn-primary" disabled={!name.trim()}>
+                Save singer
               </button>
             </div>
           </form>

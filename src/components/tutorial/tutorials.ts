@@ -9,7 +9,7 @@
  * button, or the page has no such thing right now) the step simply shows in the middle instead.
  */
 
-export type PageKey = "songs" | "song" | "setlists" | "setlist" | "editor" | "import" | "practice";
+export type PageKey = "songs" | "song" | "setlists" | "setlist" | "editor" | "import" | "practice" | "schedule" | "team";
 
 export type TutorialStep = {
   /** The data-tour value of the element to point at. */
@@ -43,6 +43,8 @@ export const PAGE_NAMES: Record<PageKey, string> = {
   editor: "the song editor",
   import: "the Import page",
   practice: "the Practice page",
+  schedule: "the Schedule page",
+  team: "the Team page",
 };
 
 /** Which page the address is: used to offer the right tutorials. Null where there are none. */
@@ -55,6 +57,8 @@ export function pageKeyFor(pathname: string): PageKey | null {
   if (pathname === "/setlists") return "setlists";
   if (/^\/setlists\/[^/]+$/.test(pathname)) return "setlist";
   if (pathname === "/practice" || pathname.startsWith("/practice/")) return "practice";
+  if (pathname === "/schedule") return "schedule";
+  if (pathname === "/members") return "team";
   return null;
 }
 
@@ -70,8 +74,8 @@ const SITE: Tutorial = {
     },
     {
       target: "nav",
-      title: "Two places to start",
-      body: "Songs is your library: every song with its lyrics and chords. Setlists is where you plan a service by putting songs in order.",
+      title: "Four places to start",
+      body: "Songs is your library: every song with its lyrics and chords. Setlists is where you plan a service by putting songs in order. Schedule says who is on the team each Sunday. Practice teaches the keys.",
     },
     {
       target: "sidebar",
@@ -88,8 +92,21 @@ const SITE: Tutorial = {
       body: "A setlist is a list of songs for a service. Each song in it remembers its own key, capo, text size and chord style, and you can even change its chords for that setlist only. Setlists clear themselves after a month by default (you can keep them up to a year); your songs always stay.",
     },
     {
+      title: "Schedule",
+      body: "Every Sunday is on the schedule already. Put the song leader, the band and the sound booth on each one, add events in between, and see who has been serving lately in the summary on the side. Each church chooses its own columns, and the schedule imports and exports Excel files.",
+    },
+    {
+      title: "Setlists and the schedule",
+      body: "Link a setlist to its Sunday (or any event) from the setlist page or from the schedule. Then the team for that service shows beside the setlist, prints on it, and the schedule shows which setlist each service uses.",
+    },
+    {
+      title: "Your church and your team",
+      body: "A church registers once, and band and media team members apply to join it with their own accounts. The church's main accounts approve people and can make admins; admins run the schedule. The Team page is where this happens.",
+      optional: true,
+    },
+    {
       title: "Going live",
-      body: "Go live fills the screen with the song for the band. Open the same setlist on other screens and mark each one as Stage, Media or Viewer; changes then show on all of them as they happen. Guides in the Tutorial menu explain this step by step.",
+      body: "Go live fills the screen with the song for the band. Open the same setlist on other screens and mark each one as Stage, Media or Viewer; changes then show on all of them as they happen. Musicians can also follow on their phones with a PIN, with no login. Guides in the Tutorial menu explain this step by step.",
     },
     {
       target: "theme",
@@ -403,6 +420,12 @@ const PAGES: Tutorial[] = [
         optional: true,
       },
       {
+        target: "setlist-roster",
+        sidebar: true,
+        title: "Schedule and team",
+        body: "Link this setlist to its service on the schedule. The song leader, the band and the sound booth for that service then show here, and you can change them from here too. The guide “Linking a setlist to the schedule” has the steps.",
+      },
+      {
         target: "setlist-remote-fold",
         sidebar: true,
         title: "Phone remote",
@@ -422,6 +445,76 @@ const PAGES: Tutorial[] = [
         title: "What this screen is",
         body: "Choose Media, Stage or Viewer for this screen. The “Stage, Media and Viewer” guide explains the difference.",
         optional: true,
+      },
+    ],
+  },
+  {
+    id: "page-schedule",
+    kind: "page",
+    title: "How the Schedule works",
+    summary: "Who is on each Sunday and event, and what the summary shows",
+    pages: ["schedule"],
+    steps: [
+      {
+        target: "schedule-tabs",
+        title: "Schedule, Roster and Change log",
+        body: "Schedule is every Sunday plus any events in between. Roster shows everyone who can be scheduled and what each person can do. Change log records who changed what, and when.",
+      },
+      {
+        target: "schedule-toolbar",
+        title: "Add an event, filter, export",
+        body: "Anyone can add an event in between the Sundays. “Only mine” shows just the days you are on, and “Show past weeks” looks back. Export to Excel saves the schedule as a spreadsheet.",
+      },
+      {
+        target: "schedule-table",
+        title: "Putting people on",
+        body: "Press a role's cell to choose someone: names show when they last served, and the people who have been off the longest come first. A role holds one person, so choosing someone else replaces them, and “Take off” removes them. Changes show straight away and are saved in the background. Anyone already on another role that day isn't offered. Need a role that isn't there, like a saxophone? Press “+ Add a role” under the day. Choice columns (like the type of Sunday) are picked from a list, and text columns are typed in.",
+      },
+      {
+        target: "schedule-setlist",
+        title: "The setlist for the day",
+        body: "In the last column, next to Edit: link a setlist to the day, or press a linked one to open it. A day has one setlist, so choosing another replaces it (⇄), and × unlinks it. Setlists can also be linked from the setlist page.",
+      },
+      {
+        target: "schedule-summary",
+        title: "The scheduler's summary",
+        body: "Which roles are still empty in the next four weeks, who is on a lot lately, and everyone with when they last served and how often. Press a person for each role's last date, and how many of each kind of Sunday they have done. On a phone, open it from the button above the list.",
+      },
+      {
+        target: "schedule-roster",
+        title: "Who can do what",
+        body: "The Roster tab lists the band and the sound booth with a dot for every role each person can do (their ministry) and a hollow dot for roles they have served in before. Filter to Band, Sound booth or Vocals to see who covers what, and the bottom row counts how many can do each role. Edit someone to change what they can do.",
+      },
+      {
+        target: "schedule-columns",
+        title: "Make the columns yours",
+        body: "Admins and main accounts add, rename, reorder and hide columns here: a column for dancers, a pick-list for the type of Sunday, a place for the sermon title. The guide “Make the schedule fit your church” has more.",
+        optional: true,
+      },
+      {
+        target: "schedule-import",
+        title: "Import from Excel",
+        body: "Bring in your church's own spreadsheet. ChordBase finds the dates and headings, offers to make columns for ones it doesn't have, and only adds: it never removes anyone.",
+        optional: true,
+      },
+    ],
+  },
+  {
+    id: "page-team",
+    kind: "page",
+    title: "How the Team page works",
+    summary: "Requests to join, roles and who is in your church",
+    pages: ["team"],
+    steps: [
+      {
+        target: "team-requests",
+        title: "Requests to join",
+        body: "When someone applies to your church, they appear here with their name and ministries. Approve or decline. If they are already on your schedule without an account, say so, and they take over their scheduled days.",
+      },
+      {
+        target: "team-people",
+        title: "Everyone in the church",
+        body: "Main accounts can make someone an admin, take admin back, or remove a person from the church. Admins run the schedule and the people list. A church has at most two main accounts.",
       },
     ],
   },
@@ -766,6 +859,72 @@ const FUNCTIONS: Tutorial[] = [
         sidebar: true,
         title: "6. Save",
         body: "Press Save when you're happy. Until then nothing is stored.",
+      },
+    ],
+  },
+  {
+    id: "fn-link",
+    kind: "function",
+    title: "Linking a setlist to the schedule",
+    summary: "Connect a setlist to its Sunday or event, from either page",
+    pages: ["schedule", "setlist"],
+    steps: [
+      {
+        title: "What linking does",
+        body: "A linked setlist knows which service it is for. The setlist page shows the team for that service, the printed setlist lists them, and the schedule shows the setlist beside the day. Changing who is on in either place changes it in both.",
+      },
+      {
+        target: "schedule-setlist",
+        title: "From the schedule",
+        body: "On the Schedule page, press “Link a setlist” on a Sunday or event and pick one. Setlists for that very date are listed first. A Sunday that isn't saved yet is saved for you. Press the name to open the setlist.",
+      },
+      {
+        target: "setlist-roster",
+        sidebar: true,
+        title: "From the setlist",
+        body: "On a setlist, open “Schedule and team”. Press “Link to the schedule for” its date, pick another service or event, or start a team for the service. A setlist with no date takes the date of the event it is linked to.",
+      },
+      {
+        title: "Changing or unlinking",
+        body: "Press Change on the setlist (or the × beside it on the schedule) to move or remove the link. Unlinking keeps the setlist, the event and everyone who was on it.",
+      },
+      {
+        title: "Everyone can see it",
+        body: "Linking and unlinking are written to the Change log on the Schedule page, with who did it.",
+        optional: true,
+      },
+    ],
+  },
+  {
+    id: "fn-columns",
+    kind: "function",
+    title: "Make the schedule fit your church",
+    summary: "Your own columns, and importing your church's spreadsheet",
+    pages: ["schedule"],
+    steps: [
+      {
+        title: "Every church is different",
+        body: "A new church starts with vocals, band and sound booth. Yours can have a column for dancers, a team for each service, or the type of Sunday. Admins and main accounts shape the columns; everyone else fills them in.",
+      },
+      {
+        target: "schedule-columns",
+        title: "1. Open Columns",
+        body: "Add a column, rename it, move it up or down under its heading, hide it, or delete it. Hiding keeps its history, so nothing is lost and you can bring it back. Deleting removes it for good, with everyone who was on it.",
+      },
+      {
+        title: "2. Pick what goes in it",
+        body: "People columns hold the people who serve (several can share one). Choice columns pick one thing from a list you write, like Communion Sunday or Canada Sunday. Text columns hold anything you type, like a sermon title.",
+      },
+      {
+        target: "schedule-import",
+        title: "3. Or start from your spreadsheet",
+        body: "Import reads your church's own Excel file, even when the headings take two or three rows. Pick the file, then tick the new columns you want and check whether each holds people, a choice or text. A heading can also go into a column you already have.",
+      },
+      {
+        target: "schedule-summary",
+        title: "4. The counts follow your columns",
+        body: "The summary counts and the “last served” dates use your columns. If you have a column for the type of Sunday, it shows how often each person has served on each type.",
+        optional: true,
       },
     ],
   },

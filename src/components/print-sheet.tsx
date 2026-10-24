@@ -176,7 +176,10 @@ export function PrintSetlistSheet({
   songs,
   views,
   notesByView,
+  team = [],
 }: {
+  /** Who is on for the service, by role. */
+  team?: { label: string; names: string[] }[];
   name: string;
   date: string | null;
   songs: PrintableSong[];
@@ -217,6 +220,16 @@ export function PrintSetlistSheet({
       <section className="mb-10 print:break-after-page">
         <h1 className="text-3xl font-bold">{name}</h1>
         {date && <p className="mt-1 text-muted">{new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>}
+        {team.length > 0 && (
+          <dl aria-label="Team" className="mt-4 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            {team.map((t) => (
+              <div key={t.label} className="flex gap-2">
+                <dt className="w-32 flex-none text-muted">{t.label}</dt>
+                <dd className="min-w-0 flex-1 font-medium">{t.names.join(", ")}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         <ol className="mt-5 divide-y divide-line border-y border-line">
           {songs.map((s, i) => {
             const { keyLabel } = deriveSong(s.originalKey, s.settings);
