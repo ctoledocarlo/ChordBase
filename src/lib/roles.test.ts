@@ -25,6 +25,13 @@ describe("roles", () => {
     expect(can(null, "manage-members")).toBe(false);
   });
 
+  it("lets admins as well as main accounts run the schedule", () => {
+    expect(can("church", "manage-schedule")).toBe(true);
+    expect(can("admin", "manage-schedule")).toBe(true);
+    expect(can("member", "manage-schedule")).toBe(false);
+    expect(can(null, "manage-schedule")).toBe(false);
+  });
+
   it("offers the roles the church account can give", () => {
     // With two main accounts already, only admin and individual account can be given.
     expect(rolesYouCanGive("church", "member", 2)).toEqual(["admin"]);

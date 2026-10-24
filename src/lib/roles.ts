@@ -20,7 +20,7 @@ const RANK: Record<Role, number> = { church: 2, admin: 1, member: 0 };
 
 export const outranks = (a: Role, b: Role): boolean => RANK[a] > RANK[b];
 
-export type Action = "manage-members" | "answer-applications";
+export type Action = "manage-members" | "answer-applications" | "manage-schedule";
 
 /** For now only the church account manages people. */
 export function can(role: Role | null | undefined, action: Action): boolean {
@@ -29,6 +29,9 @@ export function can(role: Role | null | undefined, action: Action): boolean {
     case "manage-members":
     case "answer-applications":
       return role === "church";
+    // Admins run the people list and the schedule's events and imports alongside the main accounts.
+    case "manage-schedule":
+      return role === "church" || role === "admin";
   }
 }
 
